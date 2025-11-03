@@ -1,72 +1,56 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Zombie Shooter Camera Mode</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8">
+<title>AR Zombie Marker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- A-Frame + MindAR -->
+<script src="https://cdn.jsdelivr.net/npm/aframe@1.2.0/dist/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar/dist/mindar-image-aframe.prod.js"></script>
+
 <style>
-body { margin:0; overflow:hidden; background:black; font-family:Arial; }
-#cam { position:fixed; top:0; left:0; width:100vw; height:100vh; object-fit:cover; z-index:1; }
-#gameCanvas { position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:2; }
-#hud { position:fixed; top:10px; left:10px; color:white; font-size:18px; z-index:3; }
+body { margin:0; overflow:hidden; }
+.score {
+  position: fixed; top:10px; left:10px;
+  background:rgba(0,0,0,.6); color:#fff;
+  padding:8px 14px; border-radius:10px; font-size:18px;
+}
 </style>
 </head>
 
 <body>
 
-<video id="cam" autoplay playsinline></video>
-<canvas id="gameCanvas"></canvas>
-<div id="hud">Score: <span id="score">0</span></div>
+<div class="score">🧟 Score: <span id="score">0</span></div>
+
+<a-scene mindar-image="imageTargetSrc: ./hiro.mind; autoStart: true;" 
+         color-space="sRGB"
+         renderer="colorManagement: true, physicallyCorrectLights"
+         vr-mode-ui="enabled: false"
+         device-orientation-permission-ui="enabled: true">
+
+  <a-camera look-controls="enabled: false"></a-camera>
+
+  <a-entity mindar-image-target="targetIndex: 0">
+    <!-- Zombie primitive -->
+    <a-box id="zombie" color="#3b8e3b" depth="0.3" width="0.2" height="0.4" position="0 0 0"></a-box>
+    <a-sphere radius="0.15" color="#4ecc5a" position="0 0.35 0"></a-sphere>
+  </a-entity>
+
+</a-scene>
 
 <script>
-// ==== Camera =====
-const video = document.getElementById('cam');
-navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-.then(stream => video.srcObject = stream)
-.catch(err => {
-  alert("Camera blocked. Allow permission & refresh.");
-});
-
-// ==== Game Layer ====
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-canvas.width = innerWidth;
-canvas.height = innerHeight;
-
-let zombies = [];
 let score = 0;
+const elScore = document.getElementById("score");
+const zombie = document.getElementById("zombie");
 
-function spawnZombie() {
-  zombies.push({
-    x: Math.random()*canvas.width,
-    y: canvas.height,
-    size: 50 + Math.random()*30,
-    speed: 1 + Math.random()*2
-  });
-}
-
-setInterval(spawnZombie, 1000);
-
-canvas.addEventListener("click", (e)=>{
-  const mx = e.clientX, my = e.clientY;
-  zombies = zombies.filter(z => {
-    const hit = mx>z.x && mx<z.x+z.size && my>z.y && my<z.y+z.size;
-    if(hit) score++;
-    return !hit;
-  });
-  document.getElementById("score").textContent = score;
+zombie.addEventListener("click", () => {
+  score++;
+  elScore.textContent = score;
+  zombie.setAttribute("scale","0.01 0.01 0.01");
+  setTimeout(()=> zombie.setAttribute("scale","1 1 1"),150);
 });
-
-function draw() {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  zombies.forEach(z => {
-    z.y -= z.speed;
-    ctx.fillStyle = "green";
-    ctx.fillRect(z.x, z.y, z.size, z.size);
-  });
-  requestAnimationFrame(draw);
-}
-
-draw();
 </script>
+
 </body>
 </html>
