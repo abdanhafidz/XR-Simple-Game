@@ -1,31 +1,148 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8" />
-<title>AR Marker Test</title>
+<meta charset="utf-8">
+<title>AR Zombie Shooter Marker</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+<!-- STABLE VERSIONS -->
 <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/ar.js@3.3.2/aframe/build/aframe-ar.min.js"></script>
 
 <style>
-body { margin:0; overflow:hidden; }
+body{margin:0;overflow:hidden;font-family:sans-serif;}
+.hud{position:fixed;top:0;left:0;right:0;display:flex;gap:8px;padding:8px;z-index:10;}
+.pill{background:rgba(0,0,0,0.6);padding:6px 12px;color:#fff;border-radius:100px;font-size:12px;}
+#start{position:fixed;bottom:15px;left:50%;transform:translateX(-50%);
+background:#1e90ff;color:#fff;padding:12px 22px;border-radius:10px;font-size:16px;z-index:10;}
 </style>
 </head>
 <body>
 
-<a-scene
-  embedded
-  vr-mode-ui="enabled: false"
-  renderer="logarithmicDepthBuffer: true;"
-  arjs="sourceType: webcam; facingMode: environment; debugUIEnabled: false;">
-  
-  <a-marker preset="hiro">
-    <a-box position="0 0.5 0" rotation="0 45 0" color="red"></a-box>
-  </a-marker>
+<div class="hud">
+  <div class="pill">⏱ <span id="time">60</span>s</div>
+  <div class="pill">💯 <span id="score">0</span></div>
+  <div class="pill">🧟 <span id="alive">1</span></div>
+</div>
+<button id="start">MULAI</button>
 
-  <a-entity camera></a-entity>
+<a-scene
+    embedded
+    renderer="antialias:true; alpha:true"
+    arjs="sourceType: webcam; facingMode: environment; debugUIEnabled: false">
+
+    <a-entity light="type: ambient; intensity: 1"></a-entity>
+    <a-entity light="type: directional; intensity:0.9" position="0 1 1"></a-entity>
+
+    <a-marker preset="hiro" id="marker">
+
+      <a-cylinder radius="0.4" height="0.01" color="#333" opacity="0.3" rotation="90 0 0"></a-cylinder>
+
+      <a-entity id="z0" zombie pop-on-hit class="target" position="0.3 0 0.2"></a-entity>
+
+    </a-marker>
+
+    <a-entity camera></a-entity>
+    <a-entity id="cursor" cursor="rayOrigin: mouse" raycaster="objects: .target"></a-entity>
+
 </a-scene>
+
+<script>
+/* ZOMBIE PRIMITIVE */
+AFRAME.registerComponent("zombie",{
+  schema:{speed:{default:0.1}},
+  init(){
+    const body=document.createElement("a-box");
+    body.setAttribute("width","0.15");
+    body.setAttribute("height","0.25");
+    body.setAttribute("depth","0.1");
+    body.setAttribute("color","#2b2b2b");
+    body.setAttribute("position","0 0.15 0");
+    this.el.appendChild(body);
+
+    const head=document.createElement("a-sphere");
+    head.setAttribute("radius","0.08");
+    head.setAttribute("color","#4a9658");
+    head.setAttribute("position","0 0.32 0");
+    this.el.appendChild(head);
+
+    const ring=document.createElement("a-ring");
+    ring.setAttribute("radius-inner","0.03");
+    ring.setAttribute("radius-outer","0.05");
+    ring.setAttribute("color","#ff0");
+    ring.setAttribute("rotation","-90 0 0");
+    this.el.appendChild(ring);
+
+    this.phase=Math.random()*Math.PI*2;
+  },
+  tick(time,dt){
+    const pos=this.el.object3D.position.clone();
+    const target=new THREE.Vector3(0,pos.y,0);
+    const dir=target.sub(pos);
+    if(dir.length()>0.0001){
+      dir.normalize();
+      const step=(this.data.speed*(dt||16)/1000);
+      this.el.object3D.position.addScaledVector(dir,step);
+    }
+    if(pos.length()<0.06){window.dispatchEvent(new Event("dead"));}
+  }
+});
+
+/* POP WHEN SHOT */
+AFRAME.registerComponent("pop-on-hit",{
+  init(){
+    this.el.addEventListener("hit",()=>{
+      this.el.setAttribute("animation","property: scale; to:0.01 0.01 0.01; dur:120; easing:easeInBack");
+      setTimeout(()=>this.el.parentNode?.removeChild(this.el),150);
+    });
+  }
+});
+
+/* GAME LOGIC */
+let score=0,time=60,alive=1,timer=null;
+const scoreEl=document.querySelector("#score");
+const timeEl=document.querySelector("#time");
+const aliveEl=document.querySelector("#alive");
+const marker=document.querySelector("#marker");
+const cursor=document.querySelector("#cursor");
+
+function spawnZombie(){
+  const e=document.createElement("a-entity");
+  e.classList.add("target");
+  e.setAttribute("zombie","");
+  e.setAttribute("pop-on-hit","");
+  const r=0.25+Math.random()*0.25, a=Math.random()*Math.PI*2;
+  e.setAttribute("position",`${Math.cos(a)*r} 0 ${Math.sin(a)*r}`);
+  marker.appendChild(e);
+  alive++; aliveEl.textContent=alive;
+}
+
+document.querySelector("a-scene").addEventListener("click",()=>{
+  const hits=cursor.components.raycaster.intersections;
+  const hit=hits[0]?.object?.el;
+  if(hit && hit.classList.contains("target")){
+    score+=10; alive--;
+    scoreEl.textContent=score; aliveEl.textContent=alive;
+    hit.emit("hit");
+  }
+});
+
+/* DEAD EVENT */
+window.addEventListener("dead",()=>{
+  alert("Mampus diserang zombie 😂");
+  location.reload();
+});
+
+/* START */
+document.querySelector("#start").onclick=()=>{
+  document.querySelector("#start").style.display="none";
+  timer=setInterval(()=>{
+    time--; timeEl.textContent=time;
+    if(time<=0){ alert(`Game selesai! Skor: ${score}`); location.reload(); }
+    if(alive<3) spawnZombie();
+  },1000);
+};
+</script>
 
 </body>
 </html>
