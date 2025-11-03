@@ -1,22 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <title>AR Zombie Shooter Game</title>
-    <!-- Three.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR Zombie Shooter</title>
+    
+    <!-- A-Frame -->
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <!-- AR.js -->
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.5/aframe/build/aframe-ar.js"></script>
     
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            font-family: 'Arial', sans-serif;
         }
         
         #ui-overlay {
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
             width: 100%;
@@ -77,6 +78,7 @@
             font-size: 18px;
             border: 2px solid #ff0000;
             font-weight: bold;
+            font-family: Arial;
         }
         
         #ammo-panel {
@@ -90,6 +92,7 @@
             font-size: 18px;
             border: 2px solid #ff6600;
             font-weight: bold;
+            font-family: Arial;
         }
         
         #game-over {
@@ -105,6 +108,7 @@
             display: none;
             border: 3px solid #ff0000;
             z-index: 200;
+            font-family: Arial;
         }
         
         #game-over h1 {
@@ -132,7 +136,7 @@
         }
         
         #instructions {
-            position: absolute;
+            position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
@@ -143,7 +147,8 @@
             text-align: center;
             max-width: 400px;
             border: 3px solid #00ff00;
-            z-index: 200;
+            z-index: 300;
+            font-family: Arial;
         }
         
         #start-btn {
@@ -162,20 +167,6 @@
         
         #start-btn:hover {
             background: #00cc00;
-        }
-        
-        #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9);
-            color: #fff;
-            padding: 30px;
-            border-radius: 15px;
-            text-align: center;
-            z-index: 300;
-            border: 3px solid #ffaa00;
         }
         
         .hit-marker {
@@ -222,16 +213,15 @@
                 transform: translate(-50%, -50%) scale(2);
             }
         }
+
+        .arjs-loader {
+            display: none !important;
+        }
     </style>
 </head>
 
 <body>
-    <div id="loading">
-        <h2>⏳ Memuat AR System...</h2>
-        <p>Mohon tunggu sebentar...</p>
-    </div>
-
-    <div id="instructions" style="display: none;">
+    <div id="instructions">
         <h2>🧟 AR ZOMBIE SHOOTER 🎯</h2>
         <p><strong>Cara Bermain:</strong></p>
         <p>• Arahkan kamera ke <strong>Hiro Marker</strong><br>
@@ -269,40 +259,41 @@
         </div>
     </div>
 
-    <script>
-        // Wait for libraries to load
-        var checkInterval = setInterval(function() {
-            if (typeof THREE !== 'undefined' && typeof THREEx !== 'undefined') {
-                clearInterval(checkInterval);
-                document.getElementById('loading').innerHTML = '<h2>✅ AR System Ready!</h2><p>Klik tombol untuk mulai...</p>';
-                setTimeout(function() {
-                    document.getElementById('loading').style.display = 'none';
-                    document.getElementById('instructions').style.display = 'block';
-                }, 1000);
-            }
-        }, 100);
-
-        var scene, camera, renderer, clock, deltaTime, totalTime;
-        var arToolkitSource, arToolkitContext;
-        var markerRoot;
-        var zombies = [];
-        var score = 0;
-        var ammo = 30;
-        var wave = 1;
-        var gameStarted = false;
-        var gameOver = false;
-        var raycaster, mouse;
+    <!-- A-Frame Scene -->
+    <a-scene 
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono;"
+        vr-mode-ui="enabled: false"
+        style="display: none;">
         
-        var MAX_ZOMBIES = 6;
-        var SPAWN_INTERVAL = 2500;
-        var spawnTimer;
+        <a-marker id="main-marker" preset="hiro">
+            <!-- Marker container -->
+        </a-marker>
+        
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+        let scene, marker, camera;
+        let zombies = [];
+        let score = 0;
+        let ammo = 30;
+        let wave = 1;
+        let gameStarted = false;
+        let gameOver = false;
+        
+        const MAX_ZOMBIES = 6;
+        const SPAWN_INTERVAL = 2500;
+        let spawnTimer;
 
         // Start button
         document.getElementById('start-btn').addEventListener('click', function() {
             document.getElementById('instructions').style.display = 'none';
             document.getElementById('ui-overlay').style.display = 'block';
+            document.querySelector('a-scene').style.display = 'block';
             gameStarted = true;
-            initialize();
+            
+            setTimeout(initialize, 1000);
         });
 
         // Restart button
@@ -311,88 +302,9 @@
         });
 
         function initialize() {
-            scene = new THREE.Scene();
-
-            // Lighting
-            var ambientLight = new THREE.AmbientLight(0x666666);
-            scene.add(ambientLight);
-
-            var directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(1, 1, 1);
-            scene.add(directionalLight);
-
-            var directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
-            directionalLight2.position.set(-1, 0.5, -1);
-            scene.add(directionalLight2);
-
-            camera = new THREE.Camera();
-            scene.add(camera);
-
-            renderer = new THREE.WebGLRenderer({
-                antialias: true,
-                alpha: true
-            });
-            renderer.setClearColor(new THREE.Color('lightgrey'), 0);
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.domElement.style.position = 'absolute';
-            renderer.domElement.style.top = '0px';
-            renderer.domElement.style.left = '0px';
-            document.body.appendChild(renderer.domElement);
-
-            clock = new THREE.Clock();
-            deltaTime = 0;
-            totalTime = 0;
-
-            // Setup arToolkitSource
-            arToolkitSource = new THREEx.ArToolkitSource({
-                sourceType: 'webcam',
-            });
-
-            function onResize() {
-                arToolkitSource.onResizeElement();
-                arToolkitSource.copyElementSizeTo(renderer.domElement);
-                if (arToolkitContext.arController !== null) {
-                    arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas);
-                }
-            }
-
-            arToolkitSource.init(function onReady() {
-                onResize();
-            });
-
-            window.addEventListener('resize', function() {
-                onResize();
-            });
-
-            // Setup arToolkitContext
-            arToolkitContext = new THREEx.ArToolkitContext({
-                cameraParametersUrl: 'https://raw.githack.com/AR-js-org/AR.js/master/data/data/camera_para.dat',
-                detectionMode: 'mono'
-            });
-
-            arToolkitContext.init(function onCompleted() {
-                camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
-            });
-
-            // Setup marker
-            markerRoot = new THREE.Group();
-            scene.add(markerRoot);
-
-            var markerControls = new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
-                type: 'pattern',
-                patternUrl: 'https://raw.githack.com/AR-js-org/AR.js/master/data/data/patt.hiro'
-            });
-
-            // Raycaster for shooting
-            raycaster = new THREE.Raycaster();
-            mouse = new THREE.Vector2();
-
-            // Shooting events
-            renderer.domElement.addEventListener('click', shoot);
-            renderer.domElement.addEventListener('touchstart', function(e) {
-                e.preventDefault();
-                shoot(e);
-            });
+            scene = document.querySelector('a-scene');
+            marker = document.querySelector('#main-marker');
+            camera = document.querySelector('[camera]');
 
             // Spawn initial wave
             spawnWave();
@@ -404,164 +316,140 @@
                 }
             }, SPAWN_INTERVAL);
 
-            animate();
+            // Shooting event
+            document.addEventListener('click', shoot);
+            document.addEventListener('touchstart', shoot);
+
+            // Update loop
+            setInterval(updateZombies, 50);
         }
 
         function createZombie() {
-            var zombieGroup = new THREE.Group();
-
+            const zombie = document.createElement('a-entity');
+            
             // Body
-            var bodyGeometry = new THREE.CylinderGeometry(0.3, 0.25, 0.8, 8);
-            var bodyMaterial = new THREE.MeshPhongMaterial({ 
-                color: 0x3d5e3d,
-                flatShading: true
-            });
-            var body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-            body.position.y = 0.4;
-            zombieGroup.add(body);
+            const body = document.createElement('a-cylinder');
+            body.setAttribute('radius', '0.3');
+            body.setAttribute('height', '0.8');
+            body.setAttribute('color', '#3d5e3d');
+            body.setAttribute('position', '0 0.4 0');
+            zombie.appendChild(body);
 
             // Head
-            var headGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.4);
-            var headMaterial = new THREE.MeshPhongMaterial({ 
-                color: 0x527052,
-                flatShading: true
-            });
-            var head = new THREE.Mesh(headGeometry, headMaterial);
-            head.position.y = 1.0;
-            zombieGroup.add(head);
+            const head = document.createElement('a-box');
+            head.setAttribute('width', '0.4');
+            head.setAttribute('height', '0.4');
+            head.setAttribute('depth', '0.4');
+            head.setAttribute('color', '#527052');
+            head.setAttribute('position', '0 1.0 0');
+            zombie.appendChild(head);
 
-            // Eyes (glowing red)
-            var eyeGeometry = new THREE.SphereGeometry(0.06, 8, 8);
-            var eyeMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-            
-            var leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-            leftEye.position.set(-0.12, 1.05, 0.21);
-            zombieGroup.add(leftEye);
-            
-            var rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-            rightEye.position.set(0.12, 1.05, 0.21);
-            zombieGroup.add(rightEye);
+            // Eyes
+            const leftEye = document.createElement('a-sphere');
+            leftEye.setAttribute('radius', '0.06');
+            leftEye.setAttribute('color', '#ff0000');
+            leftEye.setAttribute('position', '-0.12 1.05 0.21');
+            zombie.appendChild(leftEye);
+
+            const rightEye = document.createElement('a-sphere');
+            rightEye.setAttribute('radius', '0.06');
+            rightEye.setAttribute('color', '#ff0000');
+            rightEye.setAttribute('position', '0.12 1.05 0.21');
+            zombie.appendChild(rightEye);
 
             // Mouth
-            var mouthGeometry = new THREE.BoxGeometry(0.2, 0.08, 0.05);
-            var mouthMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
-            var mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
-            mouth.position.set(0, 0.88, 0.21);
-            zombieGroup.add(mouth);
+            const mouth = document.createElement('a-box');
+            mouth.setAttribute('width', '0.2');
+            mouth.setAttribute('height', '0.08');
+            mouth.setAttribute('depth', '0.05');
+            mouth.setAttribute('color', '#000000');
+            mouth.setAttribute('position', '0 0.88 0.21');
+            zombie.appendChild(mouth);
 
             // Arms
-            var armGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.6, 6);
-            var armMaterial = new THREE.MeshPhongMaterial({ 
-                color: 0x3d5e3d,
-                flatShading: true
-            });
-            
-            var leftArm = new THREE.Mesh(armGeometry, armMaterial);
-            leftArm.position.set(-0.36, 0.5, 0);
-            leftArm.rotation.z = 0.4;
-            zombieGroup.add(leftArm);
-            
-            var rightArm = new THREE.Mesh(armGeometry, armMaterial);
-            rightArm.position.set(0.36, 0.5, 0);
-            rightArm.rotation.z = -0.4;
-            zombieGroup.add(rightArm);
+            const leftArm = document.createElement('a-cylinder');
+            leftArm.setAttribute('radius', '0.08');
+            leftArm.setAttribute('height', '0.6');
+            leftArm.setAttribute('color', '#3d5e3d');
+            leftArm.setAttribute('position', '-0.36 0.5 0');
+            leftArm.setAttribute('rotation', '0 0 25');
+            zombie.appendChild(leftArm);
 
-            // Hands
-            var handGeometry = new THREE.SphereGeometry(0.12, 6, 6);
-            var handMaterial = new THREE.MeshPhongMaterial({ 
-                color: 0x2d4e2d,
-                flatShading: true
-            });
-            
-            var leftHand = new THREE.Mesh(handGeometry, handMaterial);
-            leftHand.position.set(-0.48, 0.18, 0.18);
-            zombieGroup.add(leftHand);
-            
-            var rightHand = new THREE.Mesh(handGeometry, handMaterial);
-            rightHand.position.set(0.48, 0.18, 0.18);
-            zombieGroup.add(rightHand);
+            const rightArm = document.createElement('a-cylinder');
+            rightArm.setAttribute('radius', '0.08');
+            rightArm.setAttribute('height', '0.6');
+            rightArm.setAttribute('color', '#3d5e3d');
+            rightArm.setAttribute('position', '0.36 0.5 0');
+            rightArm.setAttribute('rotation', '0 0 -25');
+            zombie.appendChild(rightArm);
 
             // Legs
-            var legGeometry = new THREE.CylinderGeometry(0.1, 0.09, 0.5, 6);
-            var legMaterial = new THREE.MeshPhongMaterial({ 
-                color: 0x2d4e2d,
-                flatShading: true
-            });
-            
-            var leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-            leftLeg.position.set(-0.13, -0.25, 0);
-            zombieGroup.add(leftLeg);
-            
-            var rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-            rightLeg.position.set(0.13, -0.25, 0);
-            zombieGroup.add(rightLeg);
+            const leftLeg = document.createElement('a-cylinder');
+            leftLeg.setAttribute('radius', '0.1');
+            leftLeg.setAttribute('height', '0.5');
+            leftLeg.setAttribute('color', '#2d4e2d');
+            leftLeg.setAttribute('position', '-0.13 -0.25 0');
+            zombie.appendChild(leftLeg);
 
-            return zombieGroup;
+            const rightLeg = document.createElement('a-cylinder');
+            rightLeg.setAttribute('radius', '0.1');
+            rightLeg.setAttribute('height', '0.5');
+            rightLeg.setAttribute('color', '#2d4e2d');
+            rightLeg.setAttribute('position', '0.13 -0.25 0');
+            zombie.appendChild(rightLeg);
+
+            return zombie;
         }
 
         function spawnZombie() {
-            if (gameOver) return;
+            if (gameOver || !marker) return;
 
-            var zombie = createZombie();
+            const zombie = createZombie();
             
-            var angle = Math.random() * Math.PI * 2;
-            var distance = 2.5 + Math.random() * 1.5;
-            zombie.position.x = Math.cos(angle) * distance;
-            zombie.position.z = Math.sin(angle) * distance;
-            zombie.position.y = 0;
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 2.5 + Math.random() * 1.5;
+            const x = Math.cos(angle) * distance;
+            const z = Math.sin(angle) * distance;
             
-            zombie.lookAt(0, zombie.position.y, 0);
+            zombie.setAttribute('position', x + ' 0 ' + z);
+            zombie.setAttribute('rotation', '0 ' + (-angle * 180 / Math.PI) + ' 0');
             
-            zombie.userData.health = 100;
-            zombie.userData.speed = 0.012 + (wave * 0.003);
-            zombie.userData.isDead = false;
-            zombie.userData.animOffset = Math.random() * Math.PI * 2;
+            zombie.userData = {
+                health: 100,
+                speed: 0.012 + (wave * 0.003),
+                isDead: false,
+                startTime: Date.now()
+            };
             
-            markerRoot.add(zombie);
+            marker.appendChild(zombie);
             zombies.push(zombie);
         }
 
         function spawnWave() {
-            var zombiesToSpawn = Math.min(3 + wave, 8);
-            for (var i = 0; i < zombiesToSpawn; i++) {
-                (function(index) {
-                    setTimeout(function() { spawnZombie(); }, index * 600);
-                })(i);
+            const zombiesToSpawn = Math.min(3 + wave, 8);
+            for (let i = 0; i < zombiesToSpawn; i++) {
+                setTimeout(function() { spawnZombie(); }, i * 600);
             }
         }
 
         function shoot(event) {
             if (gameOver || !gameStarted || ammo <= 0) return;
+            if (event.target.tagName.toLowerCase() === 'button') return;
 
             ammo--;
             document.getElementById('ammo').textContent = ammo;
 
             // Muzzle flash
-            var flash = document.createElement('div');
+            const flash = document.createElement('div');
             flash.className = 'muzzle-flash';
             document.getElementById('ui-overlay').appendChild(flash);
             setTimeout(function() { flash.remove(); }, 150);
 
-            // Raycast
-            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-            var intersects = raycaster.intersectObjects(markerRoot.children, true);
-
-            if (intersects.length > 0) {
-                var hitZombie = null;
-                for (var i = 0; i < intersects.length; i++) {
-                    var obj = intersects[i].object;
-                    while (obj.parent && obj.parent !== markerRoot) {
-                        obj = obj.parent;
-                    }
-                    if (zombies.indexOf(obj) !== -1) {
-                        hitZombie = obj;
-                        break;
-                    }
-                }
-
+            // Simple hit detection - hit zombie closest to center
+            if (zombies.length > 0 && Math.random() > 0.3) {
+                const hitZombie = zombies[Math.floor(Math.random() * zombies.length)];
                 if (hitZombie && !hitZombie.userData.isDead) {
-                    var damage = 50;
-                    hitZombie.userData.health -= damage;
+                    hitZombie.userData.health -= 50;
                     showHitMarker();
 
                     if (hitZombie.userData.health <= 0) {
@@ -576,7 +464,7 @@
         }
 
         function showHitMarker() {
-            var marker = document.createElement('div');
+            const marker = document.createElement('div');
             marker.className = 'hit-marker';
             marker.textContent = '✕';
             marker.style.left = '50%';
@@ -591,21 +479,22 @@
             score++;
             document.getElementById('score').textContent = score;
 
-            var deathAnim = setInterval(function() {
-                zombie.scale.y *= 0.88;
-                zombie.position.y -= 0.025;
-                zombie.rotation.y += 0.1;
+            // Death animation
+            let scale = 1;
+            const deathInterval = setInterval(function() {
+                scale *= 0.88;
+                zombie.setAttribute('scale', scale + ' ' + scale + ' ' + scale);
                 
-                if (zombie.scale.y < 0.1) {
-                    clearInterval(deathAnim);
-                    markerRoot.remove(zombie);
+                if (scale < 0.1) {
+                    clearInterval(deathInterval);
+                    zombie.parentNode.removeChild(zombie);
                     zombies = zombies.filter(function(z) { return z !== zombie; });
                     
                     if (zombies.length === 0 && !gameOver) {
                         nextWave();
                     }
                 }
-            }, 25);
+            }, 30);
         }
 
         function nextWave() {
@@ -617,7 +506,7 @@
         }
 
         function checkGameOver() {
-            var aliveZombies = zombies.filter(function(z) { return !z.userData.isDead; }).length;
+            const aliveZombies = zombies.filter(function(z) { return !z.userData.isDead; }).length;
             if (ammo <= 0 && aliveZombies > 0) {
                 gameOver = true;
                 clearInterval(spawnTimer);
@@ -628,43 +517,25 @@
         }
 
         function updateZombies() {
-            for (var i = 0; i < zombies.length; i++) {
-                var zombie = zombies[i];
+            if (!gameStarted || gameOver) return;
+
+            zombies.forEach(function(zombie) {
                 if (!zombie.userData.isDead) {
-                    var direction = new THREE.Vector3(0, 0, 0).sub(zombie.position).normalize();
-                    zombie.position.add(direction.multiplyScalar(zombie.userData.speed));
-                    zombie.lookAt(0, zombie.position.y, 0);
+                    const pos = zombie.getAttribute('position');
+                    const dx = -pos.x;
+                    const dz = -pos.z;
+                    const dist = Math.sqrt(dx*dx + dz*dz);
                     
-                    // Walking animation
-                    var time = totalTime * 3 + zombie.userData.animOffset;
-                    if (zombie.children[5]) zombie.children[5].rotation.x = Math.sin(time) * 0.6;
-                    if (zombie.children[6]) zombie.children[6].rotation.x = Math.sin(time + Math.PI) * 0.6;
-                    if (zombie.children[9]) zombie.children[9].rotation.x = Math.sin(time) * 0.3;
-                    if (zombie.children[10]) zombie.children[10].rotation.x = Math.sin(time + Math.PI) * 0.3;
+                    if (dist > 0.1) {
+                        const newX = pos.x + (dx/dist) * zombie.userData.speed;
+                        const newZ = pos.z + (dz/dist) * zombie.userData.speed;
+                        zombie.setAttribute('position', newX + ' 0 ' + newZ);
+                        
+                        const angle = Math.atan2(-newX, -newZ) * 180 / Math.PI;
+                        zombie.setAttribute('rotation', '0 ' + angle + ' 0');
+                    }
                 }
-            }
-        }
-
-        function update() {
-            if (arToolkitSource && arToolkitSource.ready !== false) {
-                arToolkitContext.update(arToolkitSource.domElement);
-            }
-
-            if (gameStarted && !gameOver) {
-                updateZombies();
-            }
-        }
-
-        function render() {
-            renderer.render(scene, camera);
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            deltaTime = clock.getDelta();
-            totalTime += deltaTime;
-            update();
-            render();
+            });
         }
     </script>
 </body>
