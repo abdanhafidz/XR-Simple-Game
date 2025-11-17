@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>AR Zombie Shooter</title>
     
-    <!-- A-Frame -->
-    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <!-- A-Frame (VERSI KOMPATIBEL DENGAN AR.js) -->
+    <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
     <!-- AR.js Location Based -->
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
     
@@ -280,6 +280,7 @@
 
     <!-- A-Frame Scene with Location Based AR -->
     <a-scene
+        renderer="logarithmicDepthBuffer: true;"
         vr-mode-ui="enabled: false"
         embedded
         arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;">
@@ -305,9 +306,14 @@
         const MAX_ZOMBIES = 6;
         const SPAWN_INTERVAL = 3000;
         let spawnTimer;
+        let gameLogicStarted = false;
 
         function log(msg) {
             console.log(msg);
+            const gpsInfo = document.getElementById('gps-info');
+            if (gpsInfo) {
+                gpsInfo.textContent = (gpsInfo.textContent || '') + ' | ' + msg;
+            }
         }
 
         // Start button
@@ -315,7 +321,6 @@
             document.getElementById('instructions').style.display = 'none';
             document.getElementById('ui-overlay').style.display = 'block';
             
-            // Get GPS location
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     function(position) {
@@ -328,16 +333,16 @@
                         gameStarted = true;
                         log('GPS OK: ' + userLat + ', ' + userLon);
                         
-                        setTimeout(initialize, 2000);
+                        initializeWhenSceneReady();
                     },
                     function(error) {
                         console.error('GPS Error:', error);
-                        // Use default location (Surabaya) if GPS fails
+                        // Default Surabaya
                         userLat = -7.2575;
                         userLon = 112.7521;
-                        document.getElementById('gps-info').textContent = 'Default location';
+                        document.getElementById('gps-info').textContent = 'Default: Surabaya';
                         gameStarted = true;
-                        setTimeout(initialize, 2000);
+                        initializeWhenSceneReady();
                     },
                     {
                         enableHighAccuracy: true,
@@ -355,16 +360,35 @@
             location.reload();
         });
 
-        function initialize() {
+        // Pastikan scene & camera siap dulu
+        function initializeWhenSceneReady() {
             scene = document.querySelector('a-scene');
             camera = document.querySelector('[gps-camera]');
 
-            log('Game initialized!');
+            if (!scene) {
+                console.error('Scene not found!');
+                return;
+            }
+
+            if (scene.hasLoaded) {
+                startGameLogic();
+            } else {
+                scene.addEventListener('loaded', () => {
+                    startGameLogic();
+                });
+            }
+        }
+
+        function startGameLogic() {
+            if (gameLogicStarted) return;
+            gameLogicStarted = true;
+
+            log('Game initialized & scene loaded!');
 
             // Spawn initial wave
             setTimeout(function() {
                 spawnWave();
-            }, 1000);
+            }, 1500);
 
             // Auto spawn timer
             spawnTimer = setInterval(function() {
@@ -460,12 +484,12 @@
         }
 
         function spawnZombie() {
-            if (gameOver || !userLat || !userLon) return;
+            if (gameOver || typeof userLat === 'undefined' || typeof userLon === 'undefined') return;
 
             const zombie = createZombie();
             
-            // Random position around user (20-50 meters away)
-            const distance = 20 + Math.random() * 30;
+            // Biar gampang kelihatan dulu: 8–15 meter
+            const distance = 8 + Math.random() * 7;
             const bearing = Math.random() * Math.PI * 2;
             const offset = metersToGPS(distance, bearing);
             
@@ -475,11 +499,14 @@
             zombie.setAttribute('gps-entity-place', 
                 `latitude: ${zombieLat}; longitude: ${zombieLon};`);
             zombie.setAttribute('scale', '5 5 5');
+
+            // Biar selalu lihat ke camera (opsional)
+            zombie.setAttribute('look-at', '[gps-camera]');
             
             scene.appendChild(zombie);
             zombies.push(zombie);
             
-            log('Zombie spawned at: ' + zombieLat.toFixed(6) + ', ' + zombieLon.toFixed(6));
+            log(`Zombie spawned @ ${zombieLat.toFixed(6)}, ${zombieLon.toFixed(6)} (dist ~${distance.toFixed(1)}m)`);
         }
 
         function spawnWave() {
@@ -489,7 +516,7 @@
             for (let i = 0; i < count; i++) {
                 setTimeout(function() { 
                     spawnZombie(); 
-                }, i * 1000);
+                }, i * 800);
             }
         }
 
@@ -506,7 +533,6 @@
             document.getElementById('ui-overlay').appendChild(flash);
             setTimeout(function() { flash.remove(); }, 150);
 
-            // Raycast
             const cameraEl = document.querySelector('#camera');
             if (!cameraEl || !cameraEl.object3D) return;
 
