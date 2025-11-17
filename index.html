@@ -3,36 +3,36 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Zombie Shooter - FIXED</title>
+    <title>AR Zombie Shooter - FIXED degToRad</title>
 
-    <!-- A-FRAME COMPATIBLE WITH AR.js LOCATION -->
-    <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
+    <!-- A-FRAME (STABLE WITH AR.js GPS) -->
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
 
-    <!-- AR.js FULL VERSION (NOT NFT!) -->
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <!-- AR.js 3.3.2 GPS ONLY (NO NFT, NO BUG) -->
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
 
     <style>
         body { margin: 0; overflow: hidden; }
-        #ui { position: fixed; top: 10px; left: 10px; z-index: 9999; 
-            background: rgba(0, 0, 0, 0.6); padding: 10px; color: #0f0; 
-            font-family: monospace; border-radius: 8px; }
+        #ui {
+            position: fixed; top: 10px; left: 10px;
+            z-index: 9999; background: rgba(0,0,0,0.6);
+            padding: 10px; color: #0f0; 
+            font-family: monospace; border-radius: 8px;
+        }
         #crosshair {
-            position: fixed; top: 50%; left: 50%;
+            position: fixed; top: 50%; left: 50%; 
             transform: translate(-50%, -50%);
-            width: 40px; height: 40px; z-index: 9999;
-            pointer-events: none;
+            width: 40px; height: 40px; 
+            z-index: 9999; pointer-events: none;
         }
-        #crosshair div {
-            position: absolute; background: red;
-        }
-        .h { width: 40px; height: 2px; top: 50%; left: 0; transform: translateY(-50%); }
-        .v { width: 2px; height: 40px; left: 50%; top: 0; transform: translateX(-50%); }
+        #crosshair div { position: absolute; background: red; }
+        .h { width: 40px; height: 2px; top: 50%; }
+        .v { width: 2px; height: 40px; left: 50%; }
     </style>
 </head>
 
 <body>
 
-    <!-- UI -->
     <div id="ui">
         GPS: <span id="gps">WAITING...</span><br>
         Zombies: <span id="zcount">0</span>
@@ -43,160 +43,146 @@
         <div class="v"></div>
     </div>
 
-    <!-- SCENE -->
     <a-scene 
         vr-mode-ui="enabled: false"
         embedded
         renderer="logarithmicDepthBuffer: true;"
         arjs="sourceType: webcam; gpsWorldMapping: true; debugUIEnabled: false;">
 
-        <!-- CAMERA -->
+        <!-- BETTER CAMERA FOR GPS AR -->
         <a-entity 
             id="camera"
             camera
-            gps-camera="simulateAltitude: 1;"
+            gps-camera
             rotation-reader>
         </a-entity>
 
     </a-scene>
 
-    <script>
-        let userLat = null;
-        let userLon = null;
-        let scene = null;
-        let zombies = [];
+<script>
+let userLat = null, userLon = null;
+let scene, zombies = [];
 
-        document.addEventListener("DOMContentLoaded", () => {
-            scene = document.querySelector("a-scene");
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    scene = document.querySelector("a-scene");
+});
 
-        // 🔥 GPS CAMERA UPDATE EVENT (KRITIKAL)
-        window.addEventListener("gps-camera-update-position", (e) => {
-            userLat = e.detail.position.latitude;
-            userLon = e.detail.position.longitude;
+// ⛔ ERROR DEGTORAD FIX: GPS UPDATE EVENT
+window.addEventListener("gps-camera-update-position", e => {
+    userLat = e.detail.position.latitude;
+    userLon = e.detail.position.longitude;
 
-            document.getElementById("gps").innerText =
-                `${userLat.toFixed(6)}, ${userLon.toFixed(6)}`;
+    document.getElementById("gps").innerText =
+        `${userLat.toFixed(6)}, ${userLon.toFixed(6)}`;
 
-            // Spawn zombie pertama kali
-            if (zombies.length === 0) {
-                setTimeout(() => spawnZombie(), 1000);
-            }
-        });
+    if (zombies.length === 0) {
+        setTimeout(spawnZombie, 800);
+    }
+});
 
-        // 🔥 CONVERT METERS → GPS OFFSET
-        function metersToGPS(m, bearing) {
-            const lat = userLat * Math.PI / 180;
-            const dLat = (m * Math.cos(bearing)) / 111320;
-            const dLon = (m * Math.sin(bearing)) / (111320 * Math.cos(lat));
-            return { dLat, dLon };
+function metersToGPS(m, bearing) {
+    const lat = userLat * Math.PI / 180;
+    return {
+        dLat: (m * Math.cos(bearing)) / 111320,
+        dLon: (m * Math.sin(bearing)) / (111320 * Math.cos(lat))
+    };
+}
+
+// Simple zombie
+function createZombie() {
+    const z = document.createElement("a-entity");
+
+    const b = document.createElement("a-cylinder");
+    b.setAttribute("color", "#3d5e3d");
+    b.setAttribute("radius", "0.4");
+    b.setAttribute("height", "1");
+    b.setAttribute("position", "0 0.5 0");
+    z.appendChild(b);
+
+    const h = document.createElement("a-sphere");
+    h.setAttribute("radius", "0.3");
+    h.setAttribute("color", "#6f8f6f");
+    h.setAttribute("position", "0 1.2 0");
+    z.appendChild(h);
+
+    z.setAttribute("scale", "4 4 4");
+    z.setAttribute("look-at", "#camera");
+
+    z.userData = { health: 100, dead: false };
+
+    return z;
+}
+
+// Spawn zombie 0.5m dari player
+function spawnZombie() {
+    if (!userLat || !userLon) return;
+
+    const z = createZombie();
+    const distance = 0.5;
+    const bearing = Math.random() * Math.PI * 2;
+    const offset = metersToGPS(distance, bearing);
+
+    const lat = userLat + offset.dLat;
+    const lon = userLon + offset.dLon;
+
+    z.setAttribute("gps-entity-place", `latitude: ${lat}; longitude: ${lon}`);
+    scene.appendChild(z);
+    zombies.push(z);
+
+    document.getElementById("zcount").innerText = zombies.length;
+
+    console.log("Spawn zombie @", (distance * 100).toFixed(0), "cm");
+}
+
+document.addEventListener("click", () => {
+    if (zombies.length === 0) return;
+
+    const cam = document.querySelector("#camera");
+    const camPos = new THREE.Vector3();
+    const camDir = new THREE.Vector3();
+
+    cam.object3D.getWorldPosition(camPos);
+    cam.object3D.getWorldDirection(camDir);
+
+    const ray = new THREE.Raycaster(camPos, camDir);
+
+    let hit = null, d = Infinity;
+
+    zombies.forEach(z => {
+        if (z.userData.dead) return;
+
+        const hitTest = ray.intersectObject(z.object3D, true);
+        if (hitTest.length > 0 && hitTest[0].distance < d) {
+            d = hitTest[0].distance;
+            hit = z;
         }
+    });
 
-        // 🔥 CREATE SIMPLE ZOMBIE
-        function createZombieEntity() {
-            const z = document.createElement("a-entity");
+    if (hit) {
+        hit.userData.health -= 50;
 
-            // Body
-            const body = document.createElement("a-cylinder");
-            body.setAttribute("color", "#3d5e3d");
-            body.setAttribute("radius", "0.4");
-            body.setAttribute("height", "1");
-            body.setAttribute("position", "0 0.5 0");
-            z.appendChild(body);
+        if (hit.userData.health <= 0) killZombie(hit);
+    }
+});
 
-            // Head
-            const head = document.createElement("a-sphere");
-            head.setAttribute("color", "#6f8f6f");
-            head.setAttribute("radius", "0.3");
-            head.setAttribute("position", "0 1.2 0");
-            z.appendChild(head);
+function killZombie(z) {
+    z.userData.dead = true;
+    let s = 4;
 
-            z.userData = { health: 100, isDead: false };
-            z.setAttribute("scale", "4 4 4");
-            z.setAttribute("look-at", "#camera");
-
-            return z;
-        }
-
-        // 🔥 SPAWN ZOMBIE 0.5 METER DARI PLAYER
-        function spawnZombie() {
-            if (!userLat || !userLon) return;
-
-            const zombie = createZombieEntity();
-
-            const distance = 0.5; // 50 cm
-            const bearing = Math.random() * Math.PI * 2;
-            const offset = metersToGPS(distance, bearing);
-
-            const zLat = userLat + offset.dLat;
-            const zLon = userLon + offset.dLon;
-
-            zombie.setAttribute("gps-entity-place", `latitude: ${zLat}; longitude: ${zLon}`);
-
-            scene.appendChild(zombie);
-            zombies.push(zombie);
-
+    const shrink = setInterval(() => {
+        s *= 0.8;
+        z.setAttribute("scale", `${s} ${s} ${s}`);
+        if (s < 0.2) {
+            clearInterval(shrink);
+            z.parentNode.removeChild(z);
+            zombies = zombies.filter(k => k !== z);
             document.getElementById("zcount").innerText = zombies.length;
 
-            console.log("Spawned zombie @", (distance * 100).toFixed(0), "cm");
+            setTimeout(spawnZombie, 600);
         }
-
-        // 🔫 SHOOTING MEKANIK PAKAI RAYCASTER
-        document.addEventListener("click", () => {
-            if (!scene) return;
-            if (zombies.length === 0) return;
-
-            const cam = document.querySelector("#camera");
-            const camPos = new THREE.Vector3();
-            const camDir = new THREE.Vector3();
-
-            cam.object3D.getWorldPosition(camPos);
-            cam.object3D.getWorldDirection(camDir);
-
-            const ray = new THREE.Raycaster(camPos, camDir);
-
-            let hit = null;
-            let dist = Infinity;
-
-            zombies.forEach(z => {
-                if (z.userData.isDead) return;
-
-                const hitTest = ray.intersectObject(z.object3D, true);
-                if (hitTest.length > 0 && hitTest[0].distance < dist) {
-                    dist = hitTest[0].distance;
-                    hit = z;
-                }
-            });
-
-            if (hit) {
-                hit.userData.health -= 50;
-                console.log("Hit zombie! HP:", hit.userData.health);
-
-                if (hit.userData.health <= 0) {
-                    killZombie(hit);
-                }
-            }
-        });
-
-        // 🔥 HAPUS ZOMBIE KETIKA MATI
-        function killZombie(z) {
-            z.userData.isDead = true;
-
-            let s = 4;
-            const shrink = setInterval(() => {
-                s *= 0.8;
-                z.setAttribute("scale", `${s} ${s} ${s}`);
-                if (s < 0.2) {
-                    clearInterval(shrink);
-                    if (z.parentNode) z.parentNode.removeChild(z);
-                    zombies = zombies.filter(o => o !== z);
-                    document.getElementById("zcount").innerText = zombies.length;
-
-                    setTimeout(() => spawnZombie(), 800);
-                }
-            }, 50);
-        }
-    </script>
+    }, 50);
+}
+</script>
 
 </body>
 </html>
