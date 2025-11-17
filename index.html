@@ -3,12 +3,12 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Zombie Shooter - Location Based</title>
+    <title>AR Zombie Shooter - Markerless</title>
     
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <!-- AR.js for Location Based -->
-    <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.5/aframe/build/aframe-ar-nft.js"></script>
+    <!-- AR.js Markerless -->
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.min.js"></script>
     
     <style>
         body {
@@ -215,22 +215,36 @@
         }
 
         .arjs-loader {
-            display: none !important;
+            height: 100%;
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
-        #loading {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9);
-            color: #fff;
-            padding: 30px;
-            border-radius: 15px;
+        .arjs-loader div {
             text-align: center;
-            z-index: 400;
+            font-size: 1.25em;
+            color: white;
+        }
+
+        #debug-info {
+            position: absolute;
+            top: 100px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #0f0;
+            padding: 10px;
+            font-size: 12px;
+            font-family: monospace;
+            border-radius: 5px;
+            max-width: 200px;
             display: none;
-            font-family: Arial;
         }
     </style>
 </head>
@@ -239,20 +253,18 @@
     <div id="instructions">
         <h2>🧟 AR ZOMBIE SHOOTER 🎯</h2>
         <p><strong>Cara Bermain:</strong></p>
-        <p>• Izinkan akses <strong>kamera & lokasi</strong><br>
+        <p>• Izinkan akses <strong>kamera</strong><br>
+        • Gerakkan HP untuk melihat sekitar<br>
         • <strong>Klik/Tap</strong> untuk menembak zombie<br>
         • Habisi semua zombie sebelum ammo habis!</p>
         <p style="font-size: 12px; color: #aaa;">
-            Game menggunakan GPS & kamera Anda<br>
-            untuk menampilkan zombie di sekitar Anda
+            Zombie akan muncul di sekitar Anda<br>
+            dalam dunia nyata melalui kamera
         </p>
         <button id="start-btn">🎮 MULAI GAME</button>
     </div>
 
-    <div id="loading">
-        <h3>⏳ Memuat lokasi...</h3>
-        <p>Mohon izinkan akses GPS</p>
-    </div>
+    <div id="debug-info"></div>
 
     <div id="ui-overlay" style="display: none;">
         <div id="crosshair">
@@ -278,100 +290,47 @@
         </div>
     </div>
 
-    <!-- A-Frame Scene with Location-Based AR -->
+    <!-- A-Frame Scene with Markerless AR -->
     <a-scene 
         embedded 
         arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
         vr-mode-ui="enabled: false"
+        renderer="logarithmicDepthBuffer: true;"
         style="display: none;">
         
-        <a-camera gps-camera rotation-reader></a-camera>
+        <a-camera id="camera" position="0 1.6 0" look-controls-enabled="true"></a-camera>
+        
+        <!-- Container untuk zombie -->
+        <a-entity id="zombie-container"></a-entity>
     </a-scene>
 
     <script>
-        let scene, camera;
+        let scene, camera, zombieContainer;
         let zombies = [];
         let score = 0;
         let ammo = 30;
         let wave = 1;
         let gameStarted = false;
         let gameOver = false;
-        let userLocation = null;
         
         const MAX_ZOMBIES = 6;
         const SPAWN_INTERVAL = 2500;
-        const ZOMBIE_SPAWN_DISTANCE = 8; // meters dari pemain (jarak dekat)
+        const MIN_DISTANCE = 3; // meter
+        const MAX_DISTANCE = 8; // meter
         let spawnTimer;
-
-        // Get user location
-        function getUserLocation() {
-            return new Promise((resolve, reject) => {
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                        position => {
-                            userLocation = {
-                                lat: position.coords.latitude,
-                                lng: position.coords.longitude
-                            };
-                            console.log('User location:', userLocation);
-                            resolve(userLocation);
-                        },
-                        error => {
-                            console.error('GPS Error:', error);
-                            reject(error);
-                        },
-                        { 
-                            enableHighAccuracy: true,
-                            timeout: 10000,
-                            maximumAge: 0
-                        }
-                    );
-                } else {
-                    reject(new Error('Geolocation not supported'));
-                }
-            });
-        }
-
-        // Calculate new GPS coordinates at distance and bearing
-        function destinationPoint(lat, lng, distance, bearing) {
-            const R = 6371e3; // Earth radius in meters
-            const φ1 = lat * Math.PI / 180;
-            const λ1 = lng * Math.PI / 180;
-            const θ = bearing * Math.PI / 180;
-
-            const φ2 = Math.asin(
-                Math.sin(φ1) * Math.cos(distance / R) +
-                Math.cos(φ1) * Math.sin(distance / R) * Math.cos(θ)
-            );
-
-            const λ2 = λ1 + Math.atan2(
-                Math.sin(θ) * Math.sin(distance / R) * Math.cos(φ1),
-                Math.cos(distance / R) - Math.sin(φ1) * Math.sin(φ2)
-            );
-
-            return {
-                lat: φ2 * 180 / Math.PI,
-                lng: λ2 * 180 / Math.PI
-            };
-        }
+        let debugMode = false; // Set true untuk debug
 
         // Start button
-        document.getElementById('start-btn').addEventListener('click', async function() {
+        document.getElementById('start-btn').addEventListener('click', function() {
             document.getElementById('instructions').style.display = 'none';
-            document.getElementById('loading').style.display = 'block';
+            document.getElementById('ui-overlay').style.display = 'block';
+            document.querySelector('a-scene').style.display = 'block';
             
-            try {
-                await getUserLocation();
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('ui-overlay').style.display = 'block';
-                document.querySelector('a-scene').style.display = 'block';
-                gameStarted = true;
-                
-                setTimeout(initialize, 1500);
-            } catch (error) {
-                alert('❌ Tidak dapat mengakses GPS!\nPastikan Anda memberikan izin lokasi.');
-                location.reload();
+            if (debugMode) {
+                document.getElementById('debug-info').style.display = 'block';
             }
+            
+            setTimeout(initialize, 1500);
         });
 
         // Restart button
@@ -381,12 +340,18 @@
 
         function initialize() {
             scene = document.querySelector('a-scene');
-            camera = document.querySelector('[gps-camera]');
+            camera = document.querySelector('#camera');
+            zombieContainer = document.querySelector('#zombie-container');
+            
+            gameStarted = true;
 
             console.log('Game initialized');
+            updateDebugInfo('Game started');
 
             // Spawn initial wave
-            spawnWave();
+            setTimeout(function() {
+                spawnWave();
+            }, 500);
 
             // Auto spawn timer
             spawnTimer = setInterval(function() {
@@ -399,139 +364,152 @@
             document.addEventListener('click', shoot);
             document.addEventListener('touchstart', shoot);
 
-            // Update loop untuk zombie movement
-            setInterval(updateZombies, 100);
+            // Update loop
+            setInterval(updateZombies, 50);
+        }
+
+        function updateDebugInfo(msg) {
+            if (debugMode) {
+                const debugEl = document.getElementById('debug-info');
+                debugEl.innerHTML = `
+                    ${msg}<br>
+                    Zombies: ${zombies.length}<br>
+                    Alive: ${zombies.filter(z => !z.userData.isDead).length}<br>
+                    Score: ${score}<br>
+                    Wave: ${wave}
+                `;
+            }
         }
 
         function createZombie() {
             const zombie = document.createElement('a-entity');
+            zombie.classList.add('zombie');
             
             // Body
             const body = document.createElement('a-cylinder');
-            body.setAttribute('radius', '0.3');
-            body.setAttribute('height', '0.8');
+            body.setAttribute('radius', '0.25');
+            body.setAttribute('height', '0.7');
             body.setAttribute('color', '#3d5e3d');
-            body.setAttribute('position', '0 0.4 0');
+            body.setAttribute('position', '0 0.35 0');
             zombie.appendChild(body);
 
             // Head
             const head = document.createElement('a-box');
-            head.setAttribute('width', '0.4');
-            head.setAttribute('height', '0.4');
-            head.setAttribute('depth', '0.4');
+            head.setAttribute('width', '0.35');
+            head.setAttribute('height', '0.35');
+            head.setAttribute('depth', '0.35');
             head.setAttribute('color', '#527052');
-            head.setAttribute('position', '0 1.0 0');
+            head.setAttribute('position', '0 0.875 0');
             zombie.appendChild(head);
 
             // Eyes
             const leftEye = document.createElement('a-sphere');
-            leftEye.setAttribute('radius', '0.06');
+            leftEye.setAttribute('radius', '0.05');
             leftEye.setAttribute('color', '#ff0000');
-            leftEye.setAttribute('position', '-0.12 1.05 0.21');
+            leftEye.setAttribute('position', '-0.1 0.9 0.18');
             zombie.appendChild(leftEye);
 
             const rightEye = document.createElement('a-sphere');
-            rightEye.setAttribute('radius', '0.06');
+            rightEye.setAttribute('radius', '0.05');
             rightEye.setAttribute('color', '#ff0000');
-            rightEye.setAttribute('position', '0.12 1.05 0.21');
+            rightEye.setAttribute('position', '0.1 0.9 0.18');
             zombie.appendChild(rightEye);
 
             // Mouth
             const mouth = document.createElement('a-box');
-            mouth.setAttribute('width', '0.2');
-            mouth.setAttribute('height', '0.08');
-            mouth.setAttribute('depth', '0.05');
+            mouth.setAttribute('width', '0.15');
+            mouth.setAttribute('height', '0.06');
+            mouth.setAttribute('depth', '0.04');
             mouth.setAttribute('color', '#000000');
-            mouth.setAttribute('position', '0 0.88 0.21');
+            mouth.setAttribute('position', '0 0.77 0.18');
             zombie.appendChild(mouth);
 
             // Arms
             const leftArm = document.createElement('a-cylinder');
-            leftArm.setAttribute('radius', '0.08');
-            leftArm.setAttribute('height', '0.6');
+            leftArm.setAttribute('radius', '0.07');
+            leftArm.setAttribute('height', '0.5');
             leftArm.setAttribute('color', '#3d5e3d');
-            leftArm.setAttribute('position', '-0.36 0.5 0');
-            leftArm.setAttribute('rotation', '0 0 25');
+            leftArm.setAttribute('position', '-0.3 0.45 0');
+            leftArm.setAttribute('rotation', '0 0 20');
             zombie.appendChild(leftArm);
 
             const rightArm = document.createElement('a-cylinder');
-            rightArm.setAttribute('radius', '0.08');
-            rightArm.setAttribute('height', '0.6');
+            rightArm.setAttribute('radius', '0.07');
+            rightArm.setAttribute('height', '0.5');
             rightArm.setAttribute('color', '#3d5e3d');
-            rightArm.setAttribute('position', '0.36 0.5 0');
-            rightArm.setAttribute('rotation', '0 0 -25');
+            rightArm.setAttribute('position', '0.3 0.45 0');
+            rightArm.setAttribute('rotation', '0 0 -20');
             zombie.appendChild(rightArm);
 
             // Legs
             const leftLeg = document.createElement('a-cylinder');
-            leftLeg.setAttribute('radius', '0.1');
-            leftLeg.setAttribute('height', '0.5');
+            leftLeg.setAttribute('radius', '0.08');
+            leftLeg.setAttribute('height', '0.4');
             leftLeg.setAttribute('color', '#2d4e2d');
-            leftLeg.setAttribute('position', '-0.13 -0.25 0');
+            leftLeg.setAttribute('position', '-0.11 -0.2 0');
             zombie.appendChild(leftLeg);
 
             const rightLeg = document.createElement('a-cylinder');
-            rightLeg.setAttribute('radius', '0.1');
-            rightLeg.setAttribute('height', '0.5');
+            rightLeg.setAttribute('radius', '0.08');
+            rightLeg.setAttribute('height', '0.4');
             rightLeg.setAttribute('color', '#2d4e2d');
-            rightLeg.setAttribute('position', '0.13 -0.25 0');
+            rightLeg.setAttribute('position', '0.11 -0.2 0');
             zombie.appendChild(rightLeg);
 
             return zombie;
         }
 
         function spawnZombie() {
-            if (gameOver || !userLocation) return;
+            if (gameOver || !zombieContainer) return;
 
             const zombie = createZombie();
             
-            // Random angle dan jarak dekat (3-8 meters)
-            const angle = Math.random() * 360;
-            const distance = 3 + Math.random() * 5; // 3-8 meters
+            // Random posisi dalam radius 3-8 meter
+            const angle = Math.random() * Math.PI * 2;
+            const distance = MIN_DISTANCE + Math.random() * (MAX_DISTANCE - MIN_DISTANCE);
             
-            const zombieLocation = destinationPoint(
-                userLocation.lat,
-                userLocation.lng,
-                distance,
-                angle
-            );
-
-            // Set GPS position
-            zombie.setAttribute('gps-entity-place', 
-                `latitude: ${zombieLocation.lat}; longitude: ${zombieLocation.lng};`
-            );
+            const x = Math.cos(angle) * distance;
+            const z = Math.sin(angle) * distance;
             
-            // Scale lebih besar agar lebih terlihat
-            zombie.setAttribute('scale', '2 2 2');
+            zombie.setAttribute('position', `${x} 0 ${z}`);
+            
+            // Rotate zombie to face player
+            const rotationY = -angle * 180 / Math.PI;
+            zombie.setAttribute('rotation', `0 ${rotationY} 0`);
             
             zombie.userData = {
                 health: 100,
-                speed: 0.00003 * (1 + wave * 0.3), // Kecepatan movement dalam koordinat GPS
+                speed: 0.015 + (wave * 0.004),
                 isDead: false,
                 startTime: Date.now(),
-                targetLat: userLocation.lat,
-                targetLng: userLocation.lng,
-                currentLat: zombieLocation.lat,
-                currentLng: zombieLocation.lng
+                initialX: x,
+                initialZ: z
             };
             
-            scene.appendChild(zombie);
+            zombieContainer.appendChild(zombie);
             zombies.push(zombie);
             
-            console.log('Zombie spawned at:', zombieLocation);
+            console.log(`Zombie spawned at (${x.toFixed(2)}, ${z.toFixed(2)}), distance: ${distance.toFixed(2)}m`);
+            updateDebugInfo(`Spawned zombie ${zombies.length}`);
         }
 
         function spawnWave() {
             const zombiesToSpawn = Math.min(3 + wave, 8);
+            console.log(`Spawning wave ${wave} with ${zombiesToSpawn} zombies`);
+            
             for (let i = 0; i < zombiesToSpawn; i++) {
-                setTimeout(function() { spawnZombie(); }, i * 600);
+                setTimeout(function() { 
+                    spawnZombie(); 
+                }, i * 500);
             }
         }
 
         function shoot(event) {
             if (gameOver || !gameStarted || ammo <= 0) return;
-            if (event.target.tagName.toLowerCase() === 'button') return;
+            if (event.target.tagName && event.target.tagName.toLowerCase() === 'button') return;
 
+            event.preventDefault();
+            
             ammo--;
             document.getElementById('ammo').textContent = ammo;
 
@@ -541,17 +519,19 @@
             document.getElementById('ui-overlay').appendChild(flash);
             setTimeout(function() { flash.remove(); }, 150);
 
-            // Hit detection - 40% chance untuk hit zombie random
-            if (zombies.length > 0 && Math.random() > 0.4) {
-                const aliveZombies = zombies.filter(z => !z.userData.isDead);
-                if (aliveZombies.length > 0) {
-                    const hitZombie = aliveZombies[Math.floor(Math.random() * aliveZombies.length)];
-                    hitZombie.userData.health -= 50;
-                    showHitMarker();
+            // Simple hit detection - 50% chance hit closest zombie
+            const aliveZombies = zombies.filter(z => !z.userData.isDead);
+            if (aliveZombies.length > 0 && Math.random() > 0.35) {
+                // Hit zombie terdekat dengan center screen
+                const hitZombie = aliveZombies[0];
+                
+                hitZombie.userData.health -= 50;
+                showHitMarker();
+                
+                console.log(`Hit zombie! Health: ${hitZombie.userData.health}`);
 
-                    if (hitZombie.userData.health <= 0) {
-                        killZombie(hitZombie);
-                    }
+                if (hitZombie.userData.health <= 0) {
+                    killZombie(hitZombie);
                 }
             }
 
@@ -575,21 +555,25 @@
             zombie.userData.isDead = true;
             score++;
             document.getElementById('score').textContent = score;
+            
+            console.log(`Zombie killed! Score: ${score}`);
+            updateDebugInfo(`Killed zombie! Score: ${score}`);
 
             // Death animation
-            let scale = 2;
+            let scale = 1;
             const deathInterval = setInterval(function() {
-                scale *= 0.88;
-                zombie.setAttribute('scale', scale + ' ' + scale + ' ' + scale);
+                scale *= 0.85;
+                zombie.setAttribute('scale', `${scale} ${scale} ${scale}`);
                 
-                if (scale < 0.2) {
+                if (scale < 0.1) {
                     clearInterval(deathInterval);
                     if (zombie.parentNode) {
                         zombie.parentNode.removeChild(zombie);
                     }
-                    zombies = zombies.filter(function(z) { return z !== zombie; });
+                    zombies = zombies.filter(z => z !== zombie);
                     
-                    if (zombies.length === 0 && !gameOver) {
+                    const aliveCount = zombies.filter(z => !z.userData.isDead).length;
+                    if (aliveCount === 0 && !gameOver) {
                         nextWave();
                     }
                 }
@@ -601,43 +585,60 @@
             document.getElementById('wave').textContent = wave;
             ammo += 15;
             document.getElementById('ammo').textContent = ammo;
-            setTimeout(function() { spawnWave(); }, 2000);
+            
+            console.log(`Next wave: ${wave}`);
+            updateDebugInfo(`Wave ${wave} starting...`);
+            
+            setTimeout(function() { 
+                spawnWave(); 
+            }, 2000);
         }
 
         function checkGameOver() {
-            const aliveZombies = zombies.filter(function(z) { return !z.userData.isDead; }).length;
+            const aliveZombies = zombies.filter(z => !z.userData.isDead).length;
             if (ammo <= 0 && aliveZombies > 0) {
                 gameOver = true;
                 clearInterval(spawnTimer);
                 document.getElementById('final-score').textContent = score;
                 document.getElementById('final-wave').textContent = wave;
                 document.getElementById('game-over').style.display = 'block';
+                
+                console.log('Game Over!');
             }
         }
 
         function updateZombies() {
-            if (!gameStarted || gameOver || !userLocation) return;
+            if (!gameStarted || gameOver) return;
 
             zombies.forEach(function(zombie) {
                 if (!zombie.userData.isDead) {
-                    // Hitung arah ke player
-                    const dx = zombie.userData.targetLat - zombie.userData.currentLat;
-                    const dy = zombie.userData.targetLng - zombie.userData.currentLng;
-                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    const pos = zombie.object3D.position;
                     
-                    if (dist > 0.00001) { // Masih jauh dari player
-                        // Update posisi zombie mendekati player
-                        zombie.userData.currentLat += (dx/dist) * zombie.userData.speed;
-                        zombie.userData.currentLng += (dy/dist) * zombie.userData.speed;
+                    // Arah ke player (0,0,0)
+                    const dx = -pos.x;
+                    const dz = -pos.z;
+                    const dist = Math.sqrt(dx*dx + dz*dz);
+                    
+                    if (dist > 0.5) {
+                        // Move towards player
+                        const moveX = (dx/dist) * zombie.userData.speed;
+                        const moveZ = (dz/dist) * zombie.userData.speed;
                         
-                        // Update GPS position
-                        zombie.setAttribute('gps-entity-place', 
-                            `latitude: ${zombie.userData.currentLat}; longitude: ${zombie.userData.currentLng};`
-                        );
+                        zombie.object3D.position.x += moveX;
+                        zombie.object3D.position.z += moveZ;
+                        
+                        // Rotate to face player
+                        const angle = Math.atan2(-pos.x, -pos.z) * 180 / Math.PI;
+                        zombie.object3D.rotation.y = angle * Math.PI / 180;
                     }
                 }
             });
         }
+
+        // Scene loaded handler
+        document.querySelector('a-scene').addEventListener('loaded', function() {
+            console.log('A-Frame scene loaded');
+        });
     </script>
 </body>
 </html>
