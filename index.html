@@ -3,12 +3,10 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>XR Zombie Shooter</title>
+    <title>AR Zombie Shooter</title>
     
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <!-- A-Frame Extras for controls -->
-    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
     
     <style>
         body {
@@ -214,32 +212,56 @@
             }
         }
 
-        #mode-info {
+        #debug-panel {
             position: absolute;
-            top: 100px;
+            top: 140px;
             left: 20px;
-            background: rgba(0, 0, 0, 0.7);
-            color: #0ff;
-            padding: 10px 15px;
-            font-size: 14px;
-            font-family: Arial;
+            background: rgba(0, 0, 0, 0.85);
+            color: #0f0;
+            padding: 15px;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
             border-radius: 5px;
-            border: 1px solid #0ff;
+            border: 2px solid #0f0;
+            max-width: 300px;
+            line-height: 1.6;
+        }
+
+        #debug-panel .debug-title {
+            color: #ff0;
+            font-weight: bold;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #0f0;
+            padding-bottom: 5px;
+        }
+
+        #debug-panel .debug-item {
+            margin: 3px 0;
+        }
+
+        #debug-panel .debug-label {
+            color: #0ff;
+            display: inline-block;
+            width: 120px;
+        }
+
+        #debug-panel .debug-value {
+            color: #fff;
         }
     </style>
 </head>
 
 <body>
     <div id="instructions">
-        <h2>🧟 XR ZOMBIE SHOOTER 🎯</h2>
+        <h2>🧟 AR ZOMBIE SHOOTER 🎯</h2>
         <p><strong>Cara Bermain:</strong></p>
-        <p>• Desktop: <strong>WASD</strong> untuk gerak, <strong>Mouse</strong> untuk lihat<br>
-        • VR Headset: Gunakan <strong>controller trigger</strong><br>
-        • Mobile: <strong>Touch joystick</strong> & tap untuk tembak<br>
-        • Habisi zombie sebelum ammo habis!</p>
+        <p>• Izinkan akses <strong>kamera</strong><br>
+        • Arahkan HP ke sekitar untuk lihat zombie<br>
+        • <strong>Tap layar</strong> untuk menembak zombie<br>
+        • Habisi semua zombie sebelum ammo habis!</p>
         <p style="font-size: 12px; color: #aaa;">
-            🎮 Desktop | 🥽 VR (Quest/Vive) | 📱 Mobile<br>
-            Tekan tombol VR untuk masuk immersive mode
+            Zombie akan muncul di dunia nyata<br>
+            melalui kamera HP Anda
         </p>
         <button id="start-btn">🎮 MULAI GAME</button>
     </div>
@@ -260,7 +282,29 @@
             <div>🔫 AMMO: <span id="ammo">30</span></div>
         </div>
 
-        <div id="mode-info">🖥️ Desktop Mode</div>
+        <div id="debug-panel">
+            <div class="debug-title">🔧 DEBUG PANEL</div>
+            <div class="debug-item">
+                <span class="debug-label">AR Session:</span>
+                <span class="debug-value" id="ar-session">Inactive</span>
+            </div>
+            <div class="debug-item">
+                <span class="debug-label">Camera Pos:</span>
+                <span class="debug-value" id="camera-pos">0, 0, 0</span>
+            </div>
+            <div class="debug-item">
+                <span class="debug-label">Zombies Alive:</span>
+                <span class="debug-value" id="zombies-alive">0</span>
+            </div>
+            <div class="debug-item">
+                <span class="debug-label">Last Shot:</span>
+                <span class="debug-value" id="last-shot">None</span>
+            </div>
+            <div class="debug-item">
+                <span class="debug-label">Hit Detection:</span>
+                <span class="debug-value" id="hit-status">Ready</span>
+            </div>
+        </div>
         
         <div id="game-over">
             <h1>💀 GAME OVER!</h1>
@@ -270,73 +314,39 @@
         </div>
     </div>
 
-    <!-- A-Frame XR Scene -->
+    <!-- A-Frame AR Scene with Real World Background -->
     <a-scene 
-        renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true;"
+        embedded
+        renderer="antialias: true; alpha: true; colorManagement: true;"
+        webxr="requiredFeatures: hit-test,local-floor; optionalFeatures: dom-overlay,dom-overlay-for-handheld-ar;"
+        xr-mode-ui="enabled: true"
         style="display: none;">
         
-        <!-- Environment -->
-        <a-entity environment="preset: forest; groundColor: #445533; groundColor2: #334422;"></a-entity>
-        
-        <!-- Lighting -->
-        <a-entity light="type: ambient; intensity: 0.5;"></a-entity>
-        <a-entity light="type: directional; intensity: 0.8;" position="2 4 1"></a-entity>
-        
-        <!-- Player Camera Rig -->
-        <a-entity id="rig" position="0 0 0" movement-controls="speed: 0.15; fly: false;">
-            <a-entity 
-                id="camera" 
-                camera 
-                position="0 1.6 0" 
-                look-controls="pointerLockEnabled: true;">
-                
-                <!-- VR Controllers -->
+        <!-- AR Camera with real world passthrough -->
+        <a-entity id="camera-rig">
+            <a-camera id="camera" position="0 1.6 0" look-controls="enabled: true; magicWindowTrackingEnabled: true;">
+                <!-- Raycaster for shooting -->
                 <a-entity 
-                    id="leftHand" 
-                    oculus-touch-controls="hand: left"
-                    vive-controls="hand: left"
-                    windows-motion-controls="hand: left">
+                    id="cursor"
+                    cursor="fuse: false; rayOrigin: mouse;"
+                    raycaster="objects: .zombie; far: 20; interval: 100;">
                 </a-entity>
-                
-                <a-entity 
-                    id="rightHand" 
-                    oculus-touch-controls="hand: right"
-                    vive-controls="hand: right"
-                    windows-motion-controls="hand: right"
-                    laser-controls
-                    raycaster="objects: .zombie; far: 15;">
-                    
-                    <!-- Gun model for VR -->
-                    <a-entity position="0 0 -0.2">
-                        <a-box width="0.05" height="0.05" depth="0.3" color="#333"></a-box>
-                        <a-cylinder radius="0.02" height="0.15" color="#666" position="0 0 -0.2" rotation="90 0 0"></a-cylinder>
-                    </a-entity>
-                </a-entity>
-            </a-entity>
+            </a-camera>
         </a-entity>
-        
-        <!-- Ground plane -->
-        <a-plane 
-            position="0 0 0" 
-            rotation="-90 0 0" 
-            width="50" 
-            height="50" 
-            color="#2a4a2a"
-            shadow="receive: true;">
-        </a-plane>
         
         <!-- Zombie container -->
         <a-entity id="zombie-container"></a-entity>
-        
-        <!-- Sky -->
-        <a-sky color="#87ceeb"></a-sky>
     </a-scene>
 
     <script>
         AFRAME.registerComponent('zombie-ai', {
+            schema: {
+                speed: {type: 'number', default: 0.01}
+            },
+            
             init: function() {
-                this.speed = 0.02;
-                this.target = new THREE.Vector3(0, 0, 0);
+                this.target = new THREE.Vector3(0, 1.6, 0);
+                this.originalSpeed = this.data.speed;
             },
             
             tick: function(time, deltaTime) {
@@ -346,46 +356,59 @@
                 const camera = document.querySelector('#camera');
                 
                 if (camera) {
-                    const cameraPos = camera.object3D.position;
-                    const rigPos = document.querySelector('#rig').object3D.position;
+                    const cameraPos = camera.object3D.getWorldPosition(new THREE.Vector3());
                     
-                    this.target.x = rigPos.x + cameraPos.x;
-                    this.target.y = 0;
-                    this.target.z = rigPos.z + cameraPos.z;
+                    this.target.copy(cameraPos);
                     
                     const dx = this.target.x - pos.x;
                     const dz = this.target.z - pos.z;
                     const dist = Math.sqrt(dx*dx + dz*dz);
                     
-                    if (dist > 0.5) {
-                        const moveSpeed = this.speed * (deltaTime / 16.67);
+                    if (dist > 1.0) {
+                        const moveSpeed = this.originalSpeed * (deltaTime / 16.67);
                         this.el.object3D.position.x += (dx/dist) * moveSpeed;
                         this.el.object3D.position.z += (dz/dist) * moveSpeed;
                         
                         const angle = Math.atan2(dx, dz);
                         this.el.object3D.rotation.y = angle;
+                        
+                        // Bobbing animation
+                        const bobAmount = Math.sin(time * 0.003) * 0.05;
+                        this.el.object3D.position.y = bobAmount;
                     }
                 }
             }
         });
 
-        let scene, camera, rig, zombieContainer, rightHand;
+        AFRAME.registerComponent('clickable', {
+            init: function() {
+                this.el.addEventListener('click', () => {
+                    if (!this.el.userData.isDead) {
+                        console.log('Zombie clicked!');
+                        hitZombieDirectly(this.el);
+                    }
+                });
+            }
+        });
+
+        let scene, camera, cameraRig, zombieContainer, cursor;
         let zombies = [];
         let score = 0;
         let ammo = 30;
         let wave = 1;
         let gameStarted = false;
         let gameOver = false;
-        let isVRMode = false;
+        let lastShootTime = 0;
         
-        const MAX_ZOMBIES = 8;
+        const MAX_ZOMBIES = 6;
         const SPAWN_INTERVAL = 3000;
-        const MIN_DISTANCE = 4;
-        const MAX_DISTANCE = 10;
+        const MIN_DISTANCE = 3;
+        const MAX_DISTANCE = 8;
+        const SHOOT_COOLDOWN = 300; // ms
         let spawnTimer;
 
         // Start button
-        document.getElementById('start-btn').addEventListener('click', function() {
+        document.getElementById('start-btn').addEventListener('click', async function() {
             document.getElementById('instructions').style.display = 'none';
             document.getElementById('ui-overlay').style.display = 'block';
             document.querySelector('a-scene').style.display = 'block';
@@ -401,40 +424,30 @@
         function initialize() {
             scene = document.querySelector('a-scene');
             camera = document.querySelector('#camera');
-            rig = document.querySelector('#rig');
+            cameraRig = document.querySelector('#camera-rig');
             zombieContainer = document.querySelector('#zombie-container');
-            rightHand = document.querySelector('#rightHand');
+            cursor = document.querySelector('#cursor');
             
             gameStarted = true;
 
-            console.log('XR Game initialized');
+            console.log('AR Game initialized');
+            updateDebugInfo('ar-session', 'Active');
 
-            // Detect VR mode
+            // AR session detection
             scene.addEventListener('enter-vr', function() {
-                isVRMode = true;
-                document.getElementById('mode-info').textContent = '🥽 VR Mode';
-                document.getElementById('crosshair').style.display = 'none';
-                console.log('Entered VR mode');
+                console.log('Entered AR mode');
+                updateDebugInfo('ar-session', 'AR Mode Active');
             });
 
             scene.addEventListener('exit-vr', function() {
-                isVRMode = false;
-                document.getElementById('mode-info').textContent = '🖥️ Desktop Mode';
-                document.getElementById('crosshair').style.display = 'block';
-                console.log('Exited VR mode');
+                console.log('Exited AR mode');
+                updateDebugInfo('ar-session', 'Inactive');
             });
-
-            // VR Controller shooting
-            if (rightHand) {
-                rightHand.addEventListener('triggerdown', function() {
-                    shoot(null);
-                });
-            }
 
             // Spawn initial wave
             setTimeout(function() {
                 spawnWave();
-            }, 500);
+            }, 1000);
 
             // Auto spawn timer
             spawnTimer = setInterval(function() {
@@ -443,145 +456,162 @@
                 }
             }, SPAWN_INTERVAL);
 
-            // Desktop/Mobile shooting
-            window.addEventListener('click', function(e) {
-                if (!isVRMode) {
-                    shoot(e);
-                }
-            });
+            // Shooting events
+            const overlay = document.getElementById('ui-overlay');
+            overlay.style.pointerEvents = 'auto';
             
-            window.addEventListener('touchstart', function(e) {
-                if (!isVRMode) {
-                    shoot(e);
-                }
-            });
+            overlay.addEventListener('click', handleShoot);
+            overlay.addEventListener('touchstart', handleShoot);
+
+            // Update loop
+            setInterval(updateDebugLoop, 100);
+        }
+
+        function handleShoot(event) {
+            const now = Date.now();
+            if (now - lastShootTime < SHOOT_COOLDOWN) return;
+            
+            // Prevent shooting UI buttons
+            if (event.target.tagName === 'BUTTON') return;
+            
+            shoot(event);
+            lastShootTime = now;
+        }
+
+        function updateDebugInfo(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        }
+
+        function updateDebugLoop() {
+            if (!gameStarted) return;
+
+            // Camera position
+            if (camera) {
+                const pos = camera.object3D.getWorldPosition(new THREE.Vector3());
+                updateDebugInfo('camera-pos', `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`);
+            }
+
+            // Zombie count
+            const aliveZombies = zombies.filter(z => !z.userData.isDead).length;
+            updateDebugInfo('zombies-alive', aliveZombies);
         }
 
         function createZombie() {
             const zombie = document.createElement('a-entity');
             zombie.classList.add('zombie');
-            zombie.setAttribute('zombie-ai', '');
+            zombie.setAttribute('zombie-ai', 'speed: 0.015');
+            zombie.setAttribute('clickable', '');
             
             // Body
             const body = document.createElement('a-cylinder');
-            body.setAttribute('radius', '0.3');
-            body.setAttribute('height', '0.8');
+            body.setAttribute('radius', '0.25');
+            body.setAttribute('height', '0.7');
             body.setAttribute('color', '#3d5e3d');
-            body.setAttribute('position', '0 0.4 0');
-            body.setAttribute('shadow', 'cast: true;');
+            body.setAttribute('position', '0 0.35 0');
             zombie.appendChild(body);
 
             // Head
             const head = document.createElement('a-box');
-            head.setAttribute('width', '0.4');
-            head.setAttribute('height', '0.4');
-            head.setAttribute('depth', '0.4');
+            head.setAttribute('width', '0.35');
+            head.setAttribute('height', '0.35');
+            head.setAttribute('depth', '0.35');
             head.setAttribute('color', '#527052');
-            head.setAttribute('position', '0 1.0 0');
-            head.setAttribute('shadow', 'cast: true;');
+            head.setAttribute('position', '0 0.875 0');
             zombie.appendChild(head);
 
-            // Eyes
+            // Eyes (glowing red)
             const leftEye = document.createElement('a-sphere');
-            leftEye.setAttribute('radius', '0.06');
+            leftEye.setAttribute('radius', '0.05');
             leftEye.setAttribute('color', '#ff0000');
-            leftEye.setAttribute('position', '-0.12 1.05 0.21');
+            leftEye.setAttribute('material', 'emissive: #ff0000; emissiveIntensity: 0.8');
+            leftEye.setAttribute('position', '-0.1 0.9 0.18');
             zombie.appendChild(leftEye);
 
             const rightEye = document.createElement('a-sphere');
-            rightEye.setAttribute('radius', '0.06');
+            rightEye.setAttribute('radius', '0.05');
             rightEye.setAttribute('color', '#ff0000');
-            rightEye.setAttribute('position', '0.12 1.05 0.21');
+            rightEye.setAttribute('material', 'emissive: #ff0000; emissiveIntensity: 0.8');
+            rightEye.setAttribute('position', '0.1 0.9 0.18');
             zombie.appendChild(rightEye);
 
             // Mouth
             const mouth = document.createElement('a-box');
-            mouth.setAttribute('width', '0.2');
-            mouth.setAttribute('height', '0.08');
-            mouth.setAttribute('depth', '0.05');
+            mouth.setAttribute('width', '0.15');
+            mouth.setAttribute('height', '0.06');
+            mouth.setAttribute('depth', '0.04');
             mouth.setAttribute('color', '#000000');
-            mouth.setAttribute('position', '0 0.88 0.21');
+            mouth.setAttribute('position', '0 0.77 0.18');
             zombie.appendChild(mouth);
 
             // Arms
             const leftArm = document.createElement('a-cylinder');
-            leftArm.setAttribute('radius', '0.08');
-            leftArm.setAttribute('height', '0.6');
+            leftArm.setAttribute('radius', '0.07');
+            leftArm.setAttribute('height', '0.5');
             leftArm.setAttribute('color', '#3d5e3d');
-            leftArm.setAttribute('position', '-0.36 0.5 0');
-            leftArm.setAttribute('rotation', '0 0 25');
+            leftArm.setAttribute('position', '-0.3 0.45 0');
+            leftArm.setAttribute('rotation', '0 0 20');
             zombie.appendChild(leftArm);
 
             const rightArm = document.createElement('a-cylinder');
-            rightArm.setAttribute('radius', '0.08');
-            rightArm.setAttribute('height', '0.6');
+            rightArm.setAttribute('radius', '0.07');
+            rightArm.setAttribute('height', '0.5');
             rightArm.setAttribute('color', '#3d5e3d');
-            rightArm.setAttribute('position', '0.36 0.5 0');
-            rightArm.setAttribute('rotation', '0 0 -25');
+            rightArm.setAttribute('position', '0.3 0.45 0');
+            rightArm.setAttribute('rotation', '0 0 -20');
             zombie.appendChild(rightArm);
-
-            // Legs
-            const leftLeg = document.createElement('a-cylinder');
-            leftLeg.setAttribute('radius', '0.1');
-            leftLeg.setAttribute('height', '0.5');
-            leftLeg.setAttribute('color', '#2d4e2d');
-            leftLeg.setAttribute('position', '-0.13 -0.25 0');
-            zombie.appendChild(leftLeg);
-
-            const rightLeg = document.createElement('a-cylinder');
-            rightLeg.setAttribute('radius', '0.1');
-            rightLeg.setAttribute('height', '0.5');
-            rightLeg.setAttribute('color', '#2d4e2d');
-            rightLeg.setAttribute('position', '0.13 -0.25 0');
-            zombie.appendChild(rightLeg);
 
             return zombie;
         }
 
         function spawnZombie() {
-            if (gameOver || !zombieContainer) return;
+            if (gameOver || !zombieContainer || !camera) return;
 
             const zombie = createZombie();
             
+            // Get camera world position
+            const cameraWorldPos = camera.object3D.getWorldPosition(new THREE.Vector3());
+            
+            // Random angle and distance
             const angle = Math.random() * Math.PI * 2;
             const distance = MIN_DISTANCE + Math.random() * (MAX_DISTANCE - MIN_DISTANCE);
             
-            const x = Math.cos(angle) * distance;
-            const z = Math.sin(angle) * distance;
+            const x = cameraWorldPos.x + Math.cos(angle) * distance;
+            const z = cameraWorldPos.z + Math.sin(angle) * distance;
             
             zombie.setAttribute('position', `${x} 0 ${z}`);
             
             zombie.userData = {
                 health: 100,
                 isDead: false,
-                startTime: Date.now()
+                spawnTime: Date.now()
             };
             
             zombieContainer.appendChild(zombie);
             zombies.push(zombie);
             
-            console.log(`Zombie spawned at distance: ${distance.toFixed(2)}m`);
+            console.log(`Zombie spawned at distance: ${distance.toFixed(2)}m, position: (${x.toFixed(2)}, ${z.toFixed(2)})`);
         }
 
         function spawnWave() {
-            const zombiesToSpawn = Math.min(4 + wave, 10);
+            const zombiesToSpawn = Math.min(4 + wave, 8);
             console.log(`Spawning wave ${wave} with ${zombiesToSpawn} zombies`);
             
             for (let i = 0; i < zombiesToSpawn; i++) {
                 setTimeout(function() { 
                     spawnZombie(); 
-                }, i * 400);
+                }, i * 500);
             }
         }
 
         function shoot(event) {
             if (gameOver || !gameStarted || ammo <= 0) return;
-            if (event && event.target.tagName && event.target.tagName.toLowerCase() === 'button') return;
 
             if (event) event.preventDefault();
             
             ammo--;
             document.getElementById('ammo').textContent = ammo;
+            updateDebugInfo('last-shot', new Date().toLocaleTimeString());
 
             // Muzzle flash
             const flash = document.createElement('div');
@@ -589,51 +619,62 @@
             document.getElementById('ui-overlay').appendChild(flash);
             setTimeout(function() { flash.remove(); }, 150);
 
-            // Raycast hit detection
+            // Raycast from camera center
             const aliveZombies = zombies.filter(z => !z.userData.isDead);
             
             if (aliveZombies.length > 0) {
-                // Simple hit detection - check if any zombie is in front
-                const cameraPos = camera.object3D.position;
-                const rigPos = rig.object3D.position;
-                const cameraWorldPos = new THREE.Vector3(
-                    rigPos.x + cameraPos.x,
-                    rigPos.y + cameraPos.y,
-                    rigPos.z + cameraPos.z
-                );
-                
+                const cameraPos = camera.object3D.getWorldPosition(new THREE.Vector3());
                 const cameraDir = new THREE.Vector3();
                 camera.object3D.getWorldDirection(cameraDir);
                 
                 let closestZombie = null;
-                let closestDist = Infinity;
+                let smallestAngle = Infinity;
+                const HIT_ANGLE_THRESHOLD = 0.4; // radians (~23 degrees)
                 
                 aliveZombies.forEach(function(zombie) {
                     const zombiePos = zombie.object3D.position;
-                    const toZombie = new THREE.Vector3().subVectors(zombiePos, cameraWorldPos);
-                    const dist = toZombie.length();
+                    const toZombie = new THREE.Vector3().subVectors(zombiePos, cameraPos).normalize();
                     const angle = cameraDir.angleTo(toZombie);
                     
-                    if (angle < 0.3 && dist < closestDist) {
+                    if (angle < HIT_ANGLE_THRESHOLD && angle < smallestAngle) {
                         closestZombie = zombie;
-                        closestDist = dist;
+                        smallestAngle = angle;
                     }
                 });
                 
                 if (closestZombie) {
-                    closestZombie.userData.health -= 50;
-                    showHitMarker();
-                    
-                    console.log(`Hit zombie! Health: ${closestZombie.userData.health}`);
-
-                    if (closestZombie.userData.health <= 0) {
-                        killZombie(closestZombie);
-                    }
+                    hitZombieDirectly(closestZombie);
+                    updateDebugInfo('hit-status', `HIT! Angle: ${(smallestAngle * 57.3).toFixed(1)}°`);
+                } else {
+                    updateDebugInfo('hit-status', 'MISS');
+                    console.log('Shot missed - no zombie in crosshair');
                 }
             }
 
             if (ammo <= 0) {
                 setTimeout(checkGameOver, 1000);
+            }
+        }
+
+        function hitZombieDirectly(zombie) {
+            if (!zombie || zombie.userData.isDead) return;
+            
+            zombie.userData.health -= 50;
+            showHitMarker();
+            
+            console.log(`Hit zombie! Health: ${zombie.userData.health}`);
+
+            if (zombie.userData.health <= 0) {
+                killZombie(zombie);
+            } else {
+                // Flash red when hit
+                const head = zombie.querySelector('a-box');
+                if (head) {
+                    head.setAttribute('color', '#ff3333');
+                    setTimeout(() => {
+                        head.setAttribute('color', '#527052');
+                    }, 100);
+                }
             }
         }
 
@@ -657,9 +698,12 @@
 
             // Death animation
             let scale = 1;
+            let rotation = 0;
             const deathInterval = setInterval(function() {
-                scale *= 0.85;
+                scale *= 0.88;
+                rotation += 15;
                 zombie.setAttribute('scale', `${scale} ${scale} ${scale}`);
+                zombie.object3D.rotation.z = rotation * Math.PI / 180;
                 
                 if (scale < 0.1) {
                     clearInterval(deathInterval);
@@ -686,7 +730,7 @@
             
             setTimeout(function() { 
                 spawnWave(); 
-            }, 2000);
+            }, 2500);
         }
 
         function checkGameOver() {
