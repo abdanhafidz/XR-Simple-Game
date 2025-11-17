@@ -250,7 +250,7 @@
     <div id="instructions">
         <h2>🧟 AR ZOMBIE SHOOTER 🎯</h2>
         <p><strong>Cara Bermain:</strong></p>
-        <p>• Zombie akan muncul di depan kamera<br>
+        <p>• Zombie akan muncul dari objek merah<br>
         • <strong>Gerakkan HP</strong> untuk melihat sekeliling<br>
         • <strong>Tap layar</strong> untuk menembak<br>
         • Habisi semua zombie sebelum ammo habis!</p>
@@ -307,14 +307,33 @@
             </a-camera>
         </a-entity>
         
+        <!-- Spawn Points (Red Spheres) - Zombies will spawn from here -->
+        <a-sphere id="spawn1" position="0 1 -5" radius="0.3" color="#ff0000" 
+                  material="emissive: #ff0000; emissiveIntensity: 0.5"></a-sphere>
+        <a-sphere id="spawn2" position="3 1 -5" radius="0.3" color="#ff0000" 
+                  material="emissive: #ff0000; emissiveIntensity: 0.5"></a-sphere>
+        <a-sphere id="spawn3" position="-3 1 -5" radius="0.3" color="#ff0000" 
+                  material="emissive: #ff0000; emissiveIntensity: 0.5"></a-sphere>
+        <a-sphere id="spawn4" position="5 1 -7" radius="0.3" color="#ff0000" 
+                  material="emissive: #ff0000; emissiveIntensity: 0.5"></a-sphere>
+        <a-sphere id="spawn5" position="-5 1 -7" radius="0.3" color="#ff0000" 
+                  material="emissive: #ff0000; emissiveIntensity: 0.5"></a-sphere>
+        <a-sphere id="spawn6" position="2 1 -8" radius="0.3" color="#ff0000" 
+                  material="emissive: #ff0000; emissiveIntensity: 0.5"></a-sphere>
+        <a-sphere id="spawn7" position="-2 1 -8" radius="0.3" color="#ff0000" 
+                  material="emissive: #ff0000; emissiveIntensity: 0.5"></a-sphere>
+        <a-sphere id="spawn8" position="0 1 -10" radius="0.3" color="#ff0000" 
+                  material="emissive: #ff0000; emissiveIntensity: 0.5"></a-sphere>
+        
         <!-- Lights -->
-        <a-light type="ambient" intensity="0.8"></a-light>
-        <a-light type="directional" position="1 1 1" intensity="0.5"></a-light>
+        <a-light type="ambient" intensity="1"></a-light>
+        <a-light type="directional" position="0 5 0" intensity="0.8"></a-light>
     </a-scene>
 
     <script>
         let scene, camera, rig;
         let zombies = [];
+        let spawnPoints = [];
         let score = 0;
         let ammo = 30;
         let wave = 1;
@@ -322,7 +341,7 @@
         let gameOver = false;
         
         const MAX_ZOMBIES = 8;
-        const SPAWN_INTERVAL = 3000;
+        const SPAWN_INTERVAL = 2500;
         let spawnTimer;
 
         // Request device orientation permission for iOS
@@ -332,11 +351,11 @@
                 DeviceOrientationEvent.requestPermission()
                     .then(function(response) {
                         if (response === 'granted') {
-                            console.log('Device orientation permission granted');
+                            console.log('✅ Device orientation permission granted');
                         }
                     })
                     .catch(function(error) {
-                        console.error('Device orientation permission error:', error);
+                        console.error('❌ Device orientation permission error:', error);
                     });
             }
         }
@@ -365,7 +384,7 @@
                 gameStarted = true;
                 setTimeout(initialize, 1500);
             }).catch(function(error) {
-                console.error('Camera error:', error);
+                console.error('❌ Camera error:', error);
                 alert('Tidak dapat mengakses kamera! Error: ' + error.message);
             });
         });
@@ -380,11 +399,20 @@
             camera = document.querySelector('#camera');
             rig = document.querySelector('#rig');
 
-            console.log('Game initialized! Camera ready.');
+            // Get all spawn points
+            for (let i = 1; i <= 8; i++) {
+                const spawn = document.querySelector('#spawn' + i);
+                if (spawn) {
+                    spawnPoints.push(spawn);
+                }
+            }
+
+            console.log('✅ Game initialized!');
+            console.log('📍 Spawn points found:', spawnPoints.length);
 
             // Spawn initial wave
             setTimeout(function() {
-                console.log('Starting to spawn zombies...');
+                console.log('🌊 Starting wave 1...');
                 spawnWave();
             }, 500);
 
@@ -412,90 +440,97 @@
             const body = document.createElement('a-cylinder');
             body.setAttribute('radius', '0.4');
             body.setAttribute('height', '1');
-            body.setAttribute('color', '#3d5e3d');
+            body.setAttribute('color', '#2d4d2d');
             body.setAttribute('position', '0 0.5 0');
+            body.setAttribute('material', 'opacity: 1');
             zombie.appendChild(body);
 
             // Head
             const head = document.createElement('a-box');
-            head.setAttribute('width', '0.5');
-            head.setAttribute('height', '0.5');
-            head.setAttribute('depth', '0.5');
-            head.setAttribute('color', '#527052');
-            head.setAttribute('position', '0 1.25 0');
+            head.setAttribute('width', '0.6');
+            head.setAttribute('height', '0.6');
+            head.setAttribute('depth', '0.6');
+            head.setAttribute('color', '#3d5e3d');
+            head.setAttribute('position', '0 1.3 0');
+            head.setAttribute('material', 'opacity: 1');
             zombie.appendChild(head);
 
             // Eyes (glowing red)
             const leftEye = document.createElement('a-sphere');
-            leftEye.setAttribute('radius', '0.1');
+            leftEye.setAttribute('radius', '0.12');
             leftEye.setAttribute('color', '#ff0000');
-            leftEye.setAttribute('position', '-0.15 1.3 0.26');
-            leftEye.setAttribute('material', 'emissive: #ff0000; emissiveIntensity: 0.8');
+            leftEye.setAttribute('position', '-0.18 1.35 0.31');
+            leftEye.setAttribute('material', 'emissive: #ff0000; emissiveIntensity: 1; opacity: 1');
             zombie.appendChild(leftEye);
 
             const rightEye = document.createElement('a-sphere');
-            rightEye.setAttribute('radius', '0.1');
+            rightEye.setAttribute('radius', '0.12');
             rightEye.setAttribute('color', '#ff0000');
-            rightEye.setAttribute('position', '0.15 1.3 0.26');
-            rightEye.setAttribute('material', 'emissive: #ff0000; emissiveIntensity: 0.8');
+            rightEye.setAttribute('position', '0.18 1.35 0.31');
+            rightEye.setAttribute('material', 'emissive: #ff0000; emissiveIntensity: 1; opacity: 1');
             zombie.appendChild(rightEye);
 
-            // Mouth
+            // Mouth (black)
             const mouth = document.createElement('a-box');
-            mouth.setAttribute('width', '0.25');
-            mouth.setAttribute('height', '0.1');
-            mouth.setAttribute('depth', '0.05');
+            mouth.setAttribute('width', '0.3');
+            mouth.setAttribute('height', '0.12');
+            mouth.setAttribute('depth', '0.08');
             mouth.setAttribute('color', '#000000');
-            mouth.setAttribute('position', '0 1.05 0.26');
+            mouth.setAttribute('position', '0 1.05 0.31');
+            mouth.setAttribute('material', 'opacity: 1');
             zombie.appendChild(mouth);
 
             // Arms
             const leftArm = document.createElement('a-cylinder');
-            leftArm.setAttribute('radius', '0.1');
-            leftArm.setAttribute('height', '0.7');
-            leftArm.setAttribute('color', '#3d5e3d');
-            leftArm.setAttribute('position', '-0.45 0.6 0');
-            leftArm.setAttribute('rotation', '0 0 30');
+            leftArm.setAttribute('radius', '0.12');
+            leftArm.setAttribute('height', '0.8');
+            leftArm.setAttribute('color', '#2d4d2d');
+            leftArm.setAttribute('position', '-0.5 0.6 0');
+            leftArm.setAttribute('rotation', '0 0 40');
+            leftArm.setAttribute('material', 'opacity: 1');
             zombie.appendChild(leftArm);
 
             const rightArm = document.createElement('a-cylinder');
-            rightArm.setAttribute('radius', '0.1');
-            rightArm.setAttribute('height', '0.7');
-            rightArm.setAttribute('color', '#3d5e3d');
-            rightArm.setAttribute('position', '0.45 0.6 0');
-            rightArm.setAttribute('rotation', '0 0 -30');
+            rightArm.setAttribute('radius', '0.12');
+            rightArm.setAttribute('height', '0.8');
+            rightArm.setAttribute('color', '#2d4d2d');
+            rightArm.setAttribute('position', '0.5 0.6 0');
+            rightArm.setAttribute('rotation', '0 0 -40');
+            rightArm.setAttribute('material', 'opacity: 1');
             zombie.appendChild(rightArm);
+
+            // Make zombie visible
+            zombie.setAttribute('visible', 'true');
 
             return zombie;
         }
 
         function spawnZombie() {
-            if (gameOver) return;
+            if (gameOver || spawnPoints.length === 0) return;
 
             const zombie = createZombie();
             
-            // Spawn in front of camera with random offset
-            const distance = 5 + Math.random() * 5; // 5-10 meters ahead
-            const angleOffset = (Math.random() - 0.5) * 120; // -60 to +60 degrees from center
-            const heightOffset = (Math.random() - 0.5) * 2; // -1 to +1 meter height variation
+            // Pick random spawn point
+            const spawnPoint = spawnPoints[Math.floor(Math.random() * spawnPoints.length)];
+            const spawnPos = spawnPoint.getAttribute('position');
             
-            // Convert angle to radians
-            const rad = angleOffset * Math.PI / 180;
+            // Add small random offset
+            const offsetX = (Math.random() - 0.5) * 1;
+            const offsetZ = (Math.random() - 0.5) * 1;
             
-            // Position relative to forward direction
-            const x = Math.sin(rad) * distance;
-            const z = -Math.cos(rad) * distance;
-            const y = heightOffset;
+            const finalX = spawnPos.x + offsetX;
+            const finalY = spawnPos.y;
+            const finalZ = spawnPos.z + offsetZ;
             
-            zombie.setAttribute('position', x + ' ' + y + ' ' + z);
+            zombie.setAttribute('position', finalX + ' ' + finalY + ' ' + finalZ);
             
-            // Make zombie face the camera
-            const lookAngle = Math.atan2(x, z) * 180 / Math.PI;
-            zombie.setAttribute('rotation', '0 ' + lookAngle + ' 0');
+            // Make zombie face camera
+            const angle = Math.atan2(finalX, finalZ) * 180 / Math.PI;
+            zombie.setAttribute('rotation', '0 ' + angle + ' 0');
             
             zombie.userData = {
                 health: 100,
-                speed: 0.02 + (wave * 0.005),
+                speed: 0.025 + (wave * 0.008),
                 isDead: false,
                 spawnTime: Date.now()
             };
@@ -503,10 +538,9 @@
             scene.appendChild(zombie);
             zombies.push(zombie);
             
-            console.log('✅ Zombie spawned at position:', 
-                x.toFixed(2), y.toFixed(2), z.toFixed(2), 
-                '- Angle:', angleOffset.toFixed(1), 
-                '- Total zombies:', zombies.length);
+            console.log('🧟 Zombie spawned at:', 
+                finalX.toFixed(2), finalY.toFixed(2), finalZ.toFixed(2),
+                '- Total:', zombies.length);
         }
 
         function spawnWave() {
@@ -515,7 +549,7 @@
             for (let i = 0; i < zombiesToSpawn; i++) {
                 setTimeout(function() { 
                     spawnZombie(); 
-                }, i * 700);
+                }, i * 600);
             }
         }
 
@@ -561,13 +595,13 @@
             if (hitZombie) {
                 hitZombie.userData.health -= 50;
                 showHitMarker();
-                console.log('🎯 Hit zombie! Health:', hitZombie.userData.health, 'Distance:', minDistance.toFixed(2));
+                console.log('🎯 Hit! Health:', hitZombie.userData.health, 'Dist:', minDistance.toFixed(2));
 
                 if (hitZombie.userData.health <= 0) {
                     killZombie(hitZombie);
                 }
             } else {
-                console.log('❌ Missed!');
+                console.log('❌ Miss!');
             }
 
             if (ammo <= 0) {
@@ -590,15 +624,15 @@
             zombie.userData.isDead = true;
             score++;
             document.getElementById('score').textContent = score;
-            console.log('💀 Zombie killed! Score:', score);
+            console.log('💀 Kill! Score:', score);
 
             // Death animation
             let scale = 1;
             const deathInterval = setInterval(function() {
-                scale *= 0.85;
+                scale *= 0.82;
                 zombie.setAttribute('scale', scale + ' ' + scale + ' ' + scale);
                 
-                if (scale < 0.1) {
+                if (scale < 0.08) {
                     clearInterval(deathInterval);
                     if (zombie.parentNode) {
                         zombie.parentNode.removeChild(zombie);
@@ -618,7 +652,7 @@
             document.getElementById('wave').textContent = wave;
             ammo += 15;
             document.getElementById('ammo').textContent = ammo;
-            console.log('⚡ Next wave:', wave);
+            console.log('⚡ Wave', wave, '!');
             setTimeout(function() { spawnWave(); }, 2000);
         }
 
@@ -630,7 +664,7 @@
                 document.getElementById('final-score').textContent = score;
                 document.getElementById('final-wave').textContent = wave;
                 document.getElementById('game-over').style.display = 'block';
-                console.log('☠️ Game Over! Final score:', score);
+                console.log('☠️ Game Over! Score:', score);
             }
         }
 
@@ -648,13 +682,13 @@
                     const dz = cameraPos.z - pos.z;
                     const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
                     
-                    if (dist > 1) {
+                    if (dist > 0.8) {
                         const newX = pos.x + (dx/dist) * zombie.userData.speed;
-                        const newY = pos.y + (dy/dist) * zombie.userData.speed * 0.5;
+                        const newY = pos.y + (dy/dist) * zombie.userData.speed * 0.3;
                         const newZ = pos.z + (dz/dist) * zombie.userData.speed;
                         zombie.object3D.position.set(newX, newY, newZ);
                         
-                        // Face towards camera
+                        // Face camera
                         const angle = Math.atan2(dx, dz) * 180 / Math.PI;
                         zombie.setAttribute('rotation', '0 ' + angle + ' 0');
                     }
