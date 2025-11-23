@@ -181,11 +181,11 @@
         // CONFIG
         const CONFIG = {
             speed: 0.05,        
-            hitDistance: 3.5,   // Jarak hit diperbesar karena zombie besar
+            hitDistance: 3.5,   
             spawnDistMin: 5,    
             spawnDistMax: 10,    
             maxHp: 100,
-            damage: 10          // Damage lebih besar
+            damage: 10          
         };
 
         // STATE
@@ -196,8 +196,8 @@
         // ZOMBIE AI COMPONENT
         AFRAME.registerComponent('zombie-ai', {
             init: function() {
-                // FIX: Menurunkan posisi Y ke -3 agar terlihat menapak di tanah (jauh di bawah kamera)
-                this.el.object3D.position.y = -3; 
+                // FIX: Menurunkan posisi Y ke -10 agar terlihat menapak di tanah (sangat jauh di bawah kamera)
+                this.el.object3D.position.y = -10; 
             },
             tick: function() {
                 if (!gameState.running || this.el.dataset.dead === "true") return;
@@ -280,8 +280,8 @@
             const x = Math.sin(angle) * dist;
             const z = Math.cos(angle) * dist;
 
-            // Posisi awal di Y=-3 (sesuai setting AI)
-            zombie.setAttribute('position', `${x} -3 ${z}`);
+            // Posisi awal di Y=-10
+            zombie.setAttribute('position', `${x} -10 ${z}`);
 
             const model = document.createElement('a-entity');
             model.setAttribute('gltf-model', '#zombie-model');
