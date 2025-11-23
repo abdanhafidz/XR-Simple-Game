@@ -182,21 +182,25 @@
         <a-light type="directional" color="#fff" intensity="1.5" position="-1 1 0"></a-light>
 
         <a-camera gps-camera rotation-reader far="1000">
-            <!-- PISTOL 3D PROCEDURAL -->
-            <!-- UPDATE POSISI: Didorong ke depan (-1.2) agar tidak terlalu dekat -->
-            <a-entity id="player-gun" position="0 -1 -1.2" rotation="0 0 0" visible="false">
-                <!-- Gun Body -->
-                <a-box color="#111" width="0.08" height="0.1" depth="0.3" position="0 0 0"></a-box>
-                <!-- Barrel -->
-                <a-cylinder color="#444" radius="0.025" height="0.4" rotation="90 0 0" position="0 0.05 -0.2"></a-cylinder>
-                <!-- Handle -->
-                <a-box color="#222" width="0.06" height="0.15" depth="0.08" position="0 -0.1 0.1" rotation="-20 0 0"></a-box>
-                <!-- Laser Sight -->
-                <a-cylinder color="red" radius="0.003" height="20" rotation="90 0 0" position="0 0.08 -10" opacity="0.4"></a-cylinder>
+            <!-- PISTOL 3D RAKSASA (Procedural) -->
+            <!-- Scale 3x agar besar -->
+            <a-entity id="player-gun" position="0.5 -0.5 -1.5" rotation="0 0 0" scale="3 3 3" visible="false">
+                <!-- Gun Body (Main) -->
+                <a-box color="#1a1a1a" width="0.12" height="0.15" depth="0.5" position="0 0 0"></a-box>
+                <!-- Top Rail -->
+                <a-box color="#333" width="0.1" height="0.05" depth="0.5" position="0 0.1 0"></a-box>
+                <!-- Barrel (Laras) -->
+                <a-cylinder color="#666" radius="0.04" height="0.6" rotation="90 0 0" position="0 0.05 -0.2"></a-cylinder>
+                <!-- Glowing Core (Neon) -->
+                <a-cylinder color="#0ff" radius="0.03" height="0.4" rotation="90 0 0" position="0 0.05 -0.1" material="emissive: #0ff; emissiveIntensity: 2; opacity: 0.8"></a-cylinder>
+                <!-- Handle (Pegangan) -->
+                <a-box color="#222" width="0.08" height="0.25" depth="0.1" position="0 -0.15 0.15" rotation="-20 0 0"></a-box>
+                <!-- Laser Sight (Merah) -->
+                <a-cylinder color="red" radius="0.005" height="30" rotation="90 0 0" position="0 -0.05 -15" opacity="0.6" material="emissive: red; emissiveIntensity: 1"></a-cylinder>
                 
                 <!-- Muzzle Flash -->
-                <a-sphere id="muzzle-flash-3d" color="#ffaa00" radius="0.1" position="0 0.05 -0.5" visible="false" 
-                          material="emissive: #ffaa00; emissiveIntensity: 3; opacity: 0.8; transparent: true"></a-sphere>
+                <a-sphere id="muzzle-flash-3d" color="#ffaa00" radius="0.2" position="0 0.05 -0.7" visible="false" 
+                          material="emissive: #ffaa00; emissiveIntensity: 4; opacity: 0.9; transparent: true"></a-sphere>
             </a-entity>
         </a-camera>
     </a-scene>
@@ -221,7 +225,7 @@
             hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
             hands.setOptions({
                 maxNumHands: 1,
-                modelComplexity: 0, // 0 = Lite (Cepat), 1 = Full (Akurat)
+                modelComplexity: 0, 
                 minDetectionConfidence: 0.5,
                 minTrackingConfidence: 0.5
             });
@@ -251,26 +255,36 @@
                 cursor.style.left = `${indexTip.x * 100}%`;
                 cursor.style.top = `${indexTip.y * 100}%`;
 
-                // --- LOGIKA MAPPING 3D GUN ---
+                // --- LOGIKA MAPPING PISTOL 3D (FIX ROTASI) ---
                 if (gunEntity) {
-                    // Mapping 2D Screen (0..1) ke 3D Camera Frustum A-Frame
-                    // Perhitungan posisi pistol (mengikuti pergelangan tangan/wrist)
-                    // Kita kalikan dengan faktor lebar agar jangkauannya pas di layar
-                    const gunX = (wrist.x - 0.5) * 1.5; 
-                    const gunY = -(wrist.y - 0.5) * 1.0; // Y terbalik di 3D
+                    // Mapping Posisi
+                    // Tangan kanan di layar -> Pistol di kanan
+                    const gunX = (wrist.x - 0.5) * 3.0; // Scale faktor lebar
+                    const gunY = -(wrist.y - 0.5) * 2.0 - 0.5; // Offset ke bawah sedikit
                     
                     gunEntity.object3D.position.x = gunX;
-                    gunEntity.object3D.position.y = gunY - 0.2; // Sedikit di bawah kursor
+                    gunEntity.object3D.position.y = gunY;
                     
-                    // Rotasi Pistol agar menunjuk ke arah Kursor
-                    // Hitung sudut 2D antara pistol dan kursor
-                    // Gunakan indexTip untuk rotasi
-                    const targetX = (indexTip.x - 0.5) * 1.5;
-                    const targetY = -(indexTip.y - 0.5) * 1.0;
+                    // FIX ROTASI: Arahkan moncong pistol ke Kursor
+                    // Kita hitung sudut antara "Posisi Pistol (Wrist)" dan "Target (Index Tip)"
+                    const dx = indexTip.x - wrist.x;
+                    const dy = indexTip.y - wrist.y;
                     
-                    // Cara simpel: LookAt ke titik target di kejauhan (Z = -10)
-                    // Titik target di dunia 3D berdasarkan posisi kursor 2D
-                    gunEntity.object3D.lookAt(targetX * 5, targetY * 5, -5);
+                    // Hitung sudut rotasi Z (Miring)
+                    // +90 derajat karena default atan2 0 itu ke kanan, tapi pistol kita tegak
+                    const angleDeg = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+                    
+                    // Rotasi Z (Roll)
+                    gunEntity.object3D.rotation.z = THREE.Math.degToRad(angleDeg);
+                    
+                    // Rotasi Y (Yaw) - Agar moncong menunjuk ke tengah/kiri/kanan
+                    // Semakin ke kiri kursor, semakin putar ke kiri
+                    const yaw = (handState.x - 0.5) * -0.8; 
+                    gunEntity.object3D.rotation.y = yaw;
+                    
+                    // Sedikit Pitch (Nunduk/Dongak)
+                    const pitch = (handState.y - 0.5) * 0.5;
+                    gunEntity.object3D.rotation.x = pitch;
                 }
 
             } else {
@@ -394,12 +408,12 @@
             if(gunEntity) {
                 const originalZ = gunEntity.object3D.position.z;
                 // Mundur sedikit
-                gunEntity.object3D.position.z += 0.1;
+                gunEntity.object3D.position.z += 0.2; // Recoil lebih kuat karena pistol besar
                 const flash = document.getElementById('muzzle-flash-3d');
                 if(flash) flash.setAttribute('visible', 'true');
                 setTimeout(() => {
                     // Balik posisi
-                    gunEntity.object3D.position.z -= 0.1;
+                    gunEntity.object3D.position.z -= 0.2;
                     if(flash) flash.setAttribute('visible', 'false');
                 }, 50);
             }
@@ -410,9 +424,6 @@
             
             let aimX = 0, aimY = 0;
             if (handState.detected) {
-                // Konversi koordinat MediaPipe (0..1) ke NDC (-1..1)
-                // MediaPipe X: 0(kiri)..1(kanan). NDC X: -1(kiri)..1(kanan). => (x * 2) - 1
-                // MediaPipe Y: 0(atas)..1(bawah). NDC Y: 1(atas)..-1(bawah). => -(y * 2) + 1
                 aimX = (handState.x * 2) - 1;
                 aimY = -(handState.y * 2) + 1;
             }
