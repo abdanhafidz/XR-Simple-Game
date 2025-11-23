@@ -6,9 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AR Zombie Shooter: Apocalypse</title>
     
-    <!-- A-Frame & AR.js Libraries -->
+    <!-- A-Frame Library -->
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <script src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js'></script>
+    
+    <!-- AR.js Library (Versi Standard untuk GPS/Location Based) -->
+    <!-- Mengganti dari aframe-ar-nft.js ke aframe-ar.js untuk stabilitas GPS yang lebih baik -->
+    <script src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js'></script>
+    
+    <!-- Extras & Look-at -->
     <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
 
@@ -251,7 +256,7 @@
         <h1>Zombie Protocol</h1>
         <p>Monster terdeteksi di lokasi Anda.<br>Gunakan kamera untuk menemukan mereka.<br>Tap layar untuk menembak.</p>
         <button class="btn" id="start-btn">INITIATE MISSION</button>
-        <p style="font-size: 12px; margin-top: 20px; color: #666;">Izinkan akses Kamera & Lokasi</p>
+        <p style="font-size: 12px; margin-top: 20px; color: #666;">Pastikan Akses Kamera & Lokasi Diizinkan.<br>Gunakan HTTPS jika di-hosting.</p>
     </div>
 
     <!-- Loading Screen -->
@@ -267,29 +272,29 @@
         <button class="btn" id="restart-btn">RETRY MISSION</button>
     </div>
 
-    <!-- AR Scene -->
+    <!-- AR Scene 
+         PERBAIKAN KAMERA:
+         1. Menghapus 'embedded' agar full screen native
+         2. Menghapus resolusi statis (sourceWidth/Height) agar auto-detect
+         3. Menggunakan parameter standard untuk webcam
+    -->
     <a-scene
         vr-mode-ui="enabled: false"
         renderer="logarithmicDepthBuffer: true; precision: medium;"
-        embedded
-        arjs='sourceType: webcam; sourceWidth:1280; sourceHeight:960; displayWidth: 1280; displayHeight: 960; debugUIEnabled: false;'>
+        arjs='sourceType: webcam; debugUIEnabled: false; videoTexture: true;'>
         
         <a-assets>
-            <!-- Menggunakan Model Monster GLTF dari Khronos Group -->
             <a-asset-item id="monster-model" src="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Monster/glTF-Binary/Monster.glb"></a-asset-item>
-            
-            <!-- Gun Sound (Optional - browser policy might block auto audio) -->
-            <!-- <audio id="gunshot" src="gunshot.mp3"></audio> -->
         </a-assets>
 
         <!-- Lighting -->
         <a-light type="ambient" color="#ffffff" intensity="0.5"></a-light>
         <a-light type="directional" color="#ffffff" intensity="1" position="-1 1 0"></a-light>
 
-        <!-- Camera with Raycaster for shooting logic -->
+        <!-- Camera GPS 
+             Menambahkan simulateLatitude/Longitude untuk testing jika di desktop (opsional, saat ini dimatikan)
+        -->
         <a-camera gps-camera rotation-reader>
-            <!-- Invisible raycaster pointing forward for game logic -->
-            <!-- We handle raycasting manually in JS for better control on 'tap' -->
         </a-camera>
 
     </a-scene>
@@ -301,7 +306,7 @@
             spawnRadiusMin: 10,
             spawnRadiusMax: 25, // meters
             startAmmo: 25,
-            modelScale: 0.05 // Monster model is huge, scale it down
+            modelScale: 0.05 
         };
 
         // --- State Management ---
@@ -351,13 +356,11 @@
             setTimeout(() => ui.damageOverlay.style.boxShadow = "none", 50);
 
             // Raycast logic
-            const camera = document.querySelector('[gps-camera]').object3D.children[0]; // Access Three.js camera
+            const camera = document.querySelector('[gps-camera]').object3D.children[0]; 
             if(!camera) return;
 
             raycaster.setFromCamera(centerScreen, camera);
             
-            // Get all zombie meshes
-            // Note: We need to intersect the mesh inside the a-entity
             const zombieMeshes = [];
             state.zombies.forEach(z => {
                 if(z.object3D) zombieMeshes.push(z.object3D);
@@ -366,12 +369,9 @@
             const intersects = raycaster.intersectObjects(zombieMeshes, true);
 
             if (intersects.length > 0) {
-                // Find the first object that is part of a zombie
                 const hitObject = intersects[0].object;
                 
-                // Traverse up to find the a-entity wrapper
                 let entity = hitObject.el;
-                // Sometimes hitObject is a mesh inside the entity, bubble up
                 while(entity && !entity.classList.contains('zombie')) {
                     entity = entity.parentNode;
                 }
@@ -389,14 +389,10 @@
         function hitZombie(entity) {
             if (entity.dataset.dead === "true") return;
 
-            // Health logic could go here, for now 1 shot = 1 kill
             entity.dataset.dead = "true";
             
-            // Visual feedback
             showHitMarker();
             
-            // Play death animation if available, or just shrink
-            // For this GLB model, we might not have easy access to mixer, so we scale down
             entity.setAttribute('animation', {
                 property: 'scale',
                 to: '0 0 0',
@@ -433,33 +429,22 @@
             const zombie = document.createElement('a-entity');
             zombie.classList.add('zombie');
             
-            // Calculate random GPS offset
             const angle = Math.random() * Math.PI * 2;
             const distance = CONFIG.spawnRadiusMin + Math.random() * (CONFIG.spawnRadiusMax - CONFIG.spawnRadiusMin);
             
-            // Approximate lat/lng offset (1 degree ~ 111km)
             const latOffset = (Math.cos(angle) * distance) / 111111;
             const lngOffset = (Math.sin(angle) * distance) / (111111 * Math.cos(state.userLocation.latitude * Math.PI / 180));
             
             const lat = state.userLocation.latitude + latOffset;
             const lng = state.userLocation.longitude + lngOffset;
 
-            // Set GPS Place
             zombie.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lng}`);
-            
-            // Look at camera (always face player)
             zombie.setAttribute('look-at', '[gps-camera]');
 
-            // 3D Model Container
             const modelWrapper = document.createElement('a-entity');
-            // FIX: Offset Y to -1.6 (approx eye level) to make it look grounded
             modelWrapper.setAttribute('position', '0 -1.6 0'); 
-            
-            // GLTF Model
             modelWrapper.setAttribute('gltf-model', '#monster-model');
             modelWrapper.setAttribute('scale', `${CONFIG.modelScale} ${CONFIG.modelScale} ${CONFIG.modelScale}`);
-            
-            // Animation (A-Frame extras animation-mixer to play embedded animations)
             modelWrapper.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1');
 
             zombie.appendChild(modelWrapper);
@@ -470,19 +455,17 @@
 
         function startNextWave() {
             state.wave++;
-            state.ammo += 10; // Bonus ammo
+            state.ammo += 10; 
             
-            // Visual Notification
             const announcement = document.createElement('div');
             announcement.style.cssText = "position:fixed; top:30%; width:100%; text-align:center; color:#ffaa00; font-size:40px; font-weight:bold; text-shadow:0 0 20px black; z-index:20; pointer-events:none;";
             announcement.innerText = `WAVE ${state.wave}`;
             document.body.appendChild(announcement);
             setTimeout(() => announcement.remove(), 3000);
 
-            // Spawn loop
             const count = Math.min(state.wave + 2, CONFIG.maxZombies);
             for(let i=0; i<count; i++) {
-                setTimeout(spawnZombie, i * 1000); // Stagger spawns
+                setTimeout(spawnZombie, i * 1000); 
             }
             updateHUD();
         }
@@ -492,7 +475,8 @@
                 state.isGameRunning = false;
                 document.getElementById('final-score').innerText = state.score;
                 ui.gameOverScreen.style.display = 'flex';
-                ui.uiLayer.style.display = 'none';
+                // Note: We don't hide ui-layer completely, just maybe the HUD parts?
+                // Keeping it simpler for now
             }
         }
 
@@ -516,15 +500,11 @@
             state.isGameRunning = true;
             ui.loadingScreen.style.display = 'none';
             
-            // Enable Tap to Shoot
             window.addEventListener('click', shoot);
             window.addEventListener('touchstart', (e) => {
-                // Prevent default touch behavior (zooming/scrolling) if necessary
-                // e.preventDefault(); 
                 shoot();
             }, {passive: false});
 
-            // Start First Wave
             startNextWave();
         }
 
