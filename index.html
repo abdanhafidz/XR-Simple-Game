@@ -47,27 +47,38 @@
         .critical { animation: pulse 1s infinite; }
         @keyframes pulse { 0% { opacity: 0.3; } 100% { opacity: 0.7; } }
 
-        /* CROSSHAIR */
+        /* CURSOR (TARGET) */
         .crosshair {
-            position: absolute; width: 50px; height: 50px; 
-            border: 2px dashed #0ff; border-radius: 50%;
+            position: absolute; width: 40px; height: 40px; 
+            border: 2px solid #0f0; border-radius: 50%;
             transform: translate(-50%, -50%); opacity: 0; 
-            transition: opacity 0.2s; display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 0 15px #0ff;
-        }
-        .crosshair::after {
-            content: ''; width: 6px; height: 6px; background: #0ff;
-            border-radius: 50%; box-shadow: 0 0 10px #fff;
+            transition: opacity 0.1s;
+            box-shadow: 0 0 10px #0f0;
         }
         .crosshair.active { opacity: 1; }
-        .crosshair.locked { border-color: red; box-shadow: 0 0 20px red; }
+        .crosshair::after { content: ''; position:absolute; top:50%; left:50%; width:4px; height:4px; background:#0f0; transform:translate(-50%, -50%); }
+
+        /* FIRE BUTTON (Opsional jika tap layar susah) */
+        #fire-btn {
+            position: absolute; bottom: 120px; right: 30px;
+            width: 80px; height: 80px;
+            background: rgba(255, 0, 0, 0.5);
+            border: 3px solid #ff0000;
+            border-radius: 50%;
+            pointer-events: auto;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Orbitron'; color: white; font-weight: bold; font-size: 14px;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        #fire-btn:active { background: rgba(255, 0, 0, 0.8); transform: scale(0.95); }
 
         /* RADAR */
         .radar-box {
-            position: absolute; bottom: 100px; left: 20px;
+            position: absolute; bottom: 20px; left: 20px;
             width: 100px; height: 100px; border: 2px solid #0f0; border-radius: 50%;
             background: rgba(0, 20, 0, 0.7); overflow: hidden;
-            box-shadow: 0 0 10px #0f0;
+            box-shadow: 0 0 10px #0f0; pointer-events: auto;
         }
         .radar-center { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: #fff; transform: translate(-50%, -50%); border-radius: 50%; }
         .radar-blip { 
@@ -76,20 +87,18 @@
             box-shadow: 0 0 3px #fff;
         }
 
-        /* HUD STYLING */
+        /* HUD */
         .hud-top { display: flex; justify-content: space-between; padding: 20px; padding-top: max(20px, env(safe-area-inset-top)); }
-        .hud-bottom { display: flex; align-items: flex-end; justify-content: space-between; padding: 20px; padding-bottom: max(20px, env(safe-area-inset-bottom)); }
-        
-        .hud-panel { background: rgba(10, 20, 30, 0.85); border: 1px solid rgba(0, 255, 255, 0.5); padding: 10px; transform: skewX(-15deg); display: flex; flex-direction: column; align-items: center; min-width: 80px; }
+        .hud-panel { background: rgba(10, 20, 30, 0.85); border: 1px solid rgba(0, 255, 255, 0.5); padding: 8px 15px; transform: skewX(-15deg); display: flex; flex-direction: column; align-items: center; min-width: 80px; }
         .hud-label { font-size: 10px; color: #00ffff; font-family: 'Share Tech Mono'; transform: skewX(15deg); }
         .hud-value { font-size: 24px; color: #fff; font-family: 'Orbitron'; font-weight: 900; transform: skewX(15deg); }
         
-        /* HEALTH BAR */
-        .health-wrapper { width: 150px; transform: skewX(-15deg); margin-right: auto; margin-left: 20px; }
-        .health-bar-bg { width: 100%; height: 12px; background: #300; border: 1px solid #f00; }
-        .health-bar-fill { width: 100%; height: 100%; background: #f00; transition: width 0.2s; box-shadow: 0 0 10px #f00; }
+        /* HEALTH */
+        .health-bar-bg { position: absolute; bottom: 20px; right: 140px; width: 150px; height: 12px; background: #300; border: 1px solid #f00; transform: skewX(-15deg); }
+        .health-bar-fill { width: 100%; height: 100%; background: #f00; transition: width 0.2s; }
+        .health-label { position: absolute; bottom: 35px; right: 140px; color: #fff; font-size: 10px; font-family: 'Orbitron'; transform: skewX(-15deg); }
 
-        #hand-status { position: absolute; top: 65%; left: 50%; transform: translate(-50%, -50%); color: rgba(255, 255, 255, 0.6); font-family: 'Share Tech Mono'; font-size: 12px; pointer-events: none; text-align: center; text-shadow: 0 0 5px #000; }
+        #hand-status { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255, 255, 255, 0.8); font-family: 'Share Tech Mono'; font-size: 14px; pointer-events: none; text-align: center; text-shadow: 0 0 5px #000; width: 100%; }
 
         .fullscreen-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: auto; }
         .btn { background: #c00; color: #fff; padding: 15px 40px; font-family: 'Orbitron'; font-weight: bold; border: 2px solid #f00; margin-top: 20px; cursor: pointer; text-transform: uppercase; }
@@ -111,27 +120,25 @@
             </div>
         </div>
 
+        <!-- Cursor Hijau di Layar (Posisi Tembak) -->
         <div class="crosshair" id="finger-cursor"></div>
-        <div id="hand-status">INITIALIZING HAND TRACKING...<br>Angkat tangan Anda</div>
+        
+        <div id="hand-status">MENYIAPKAN PELACAK TANGAN...</div>
         
         <div class="radar-box" id="radar">
             <div class="radar-center"></div>
         </div>
 
-        <div class="hud-bottom">
-            <!-- HEALTH BAR -->
-            <div class="health-wrapper">
-                <div class="hud-label" style="color:#fff; margin-bottom:5px;">INTEGRITY</div>
-                <div class="health-bar-bg">
-                    <div class="health-bar-fill" id="hp-bar"></div>
-                </div>
-            </div>
+        <!-- Tombol Tembak Manual -->
+        <div id="fire-btn">FIRE</div>
 
-            <!-- AMMO -->
-            <div class="hud-panel" style="border-right: 5px solid #f00;">
-                <div class="hud-label" style="color:#f55;">AMMO</div>
-                <div class="hud-value" style="color:#f00;" id="ammo">25</div>
-            </div>
+        <!-- Health & Ammo -->
+        <div class="health-label">INTEGRITY</div>
+        <div class="health-bar-bg"><div class="health-bar-fill" id="hp-bar"></div></div>
+        
+        <div class="hud-panel" style="position: absolute; bottom: 20px; right: 20px; border-right: 5px solid #f00;">
+            <div class="hud-label" style="color:#f55;">AMMO</div>
+            <div class="hud-value" style="color:#f00;" id="ammo">25</div>
         </div>
     </div>
 
@@ -139,18 +146,17 @@
     <div id="start-screen" class="fullscreen-overlay">
         <h1 style="font-family:'Orbitron'; color:red; font-size: 32px; margin-bottom: 10px;">ZOMBIE PROTOCOL</h1>
         <p style="color:#aaa; font-family:'Share Tech Mono'; font-size: 12px; line-height: 1.6;">
-            • GUNAKAN JARI UNTUK MEMBIDIK (HAND TRACKING)<br>
-            • JARAK SERANG ZOMBIE: 8 METER<br>
-            • TAP LAYAR UNTUK MENEMBAK
+            • GUNAKAN TANGAN KANAN DI DEPAN KAMERA<br>
+            • PISTOL AKAN MENGIKUTI GERAKAN TANGAN<br>
+            • ARAHKAN KE ZOMBIE DAN TEKAN TOMBOL 'FIRE'<br>
+            • ATAU TAP LAYAR UNTUK MENEMBAK
         </p>
         <button class="btn" onclick="startGame()">START MISSION</button>
     </div>
 
-    <!-- Game Over Screen -->
     <div id="game-over-screen" class="fullscreen-overlay" style="display: none;">
         <h1 style="font-family:'Orbitron'; color:red;">MISSION FAILED</h1>
-        <p style="color:white; margin-bottom:20px;">OPERATOR KILLED IN ACTION</p>
-        <button class="btn" onclick="location.reload()">RESTART SYSTEM</button>
+        <button class="btn" onclick="location.reload()">RESTART</button>
     </div>
 
     <a-scene
@@ -167,14 +173,20 @@
         <a-light type="directional" color="#fff" intensity="1.5" position="-1 1 0"></a-light>
 
         <a-camera gps-camera rotation-reader far="1000">
-            <!-- 3D GUN MODEL (Procedural) -->
-            <a-entity id="player-gun" position="0.2 -0.3 -0.5" rotation="0 0 0" visible="false">
-                <a-box color="#111" width="0.08" height="0.12" depth="0.3" position="0 0 0"></a-box>
-                <a-cylinder color="#888" radius="0.025" height="0.4" rotation="90 0 0" position="0 0.05 -0.25"></a-cylinder>
-                <a-box color="#222" width="0.06" height="0.15" depth="0.08" position="0 -0.1 0.1" rotation="-20 0 0"></a-box>
-                <a-cylinder color="#0ff" radius="0.015" height="0.25" rotation="90 0 0" position="0 0.08 -0.1" 
-                            material="emissive: #0ff; emissiveIntensity: 2"></a-cylinder>
-                <a-sphere id="muzzle-flash-3d" color="#ffaa00" radius="0.08" position="0 0.05 -0.5" visible="false" 
+            <!-- PISTOL 3D PROCEDURAL -->
+            <!-- Kita geser posisinya agak ke kanan bawah agar terlihat seperti memegang senjata (FPS View) -->
+            <a-entity id="player-gun" position="0.3 -0.3 -0.5" rotation="0 0 0" visible="false">
+                <!-- Body -->
+                <a-box color="#222" width="0.1" height="0.15" depth="0.4" position="0 0 0"></a-box>
+                <!-- Barrel -->
+                <a-cylinder color="#555" radius="0.03" height="0.5" rotation="90 0 0" position="0 0.05 -0.2"></a-cylinder>
+                <!-- Neon Lights -->
+                <a-box color="#0ff" width="0.11" height="0.02" depth="0.3" position="0 0.08 0" material="emissive: #0ff; emissiveIntensity: 2"></a-box>
+                <!-- Laser Sight (Merah) -->
+                <a-cylinder color="red" radius="0.005" height="20" rotation="90 0 0" position="0 -0.05 -10" opacity="0.6" material="emissive: red; emissiveIntensity: 1"></a-cylinder>
+                
+                <!-- Muzzle Flash -->
+                <a-sphere id="muzzle-flash-3d" color="#ffaa00" radius="0.1" position="0 0.05 -0.6" visible="false" 
                           material="emissive: #ffaa00; emissiveIntensity: 3; opacity: 0.8; transparent: true"></a-sphere>
             </a-entity>
         </a-camera>
@@ -184,26 +196,21 @@
         // CONFIG
         const CONFIG = {
             spawnDistMin: 30, spawnDistMax: 60,
-            modelScale: 15, yOffset: -20, // Zombie Tinggi Besar
+            modelScale: 15, yOffset: -20,
             radarScale: 0.5,
-            damageDistance: 8.0, // Jarak Hit <= 8 Meter
-            damageAmount: 10,    // Damage per hit
+            damageDistance: 8.0,
+            damageAmount: 10,
             startAmmo: 25
         };
 
         let gameState = { running: false, score: 0, wave: 1, zombies: [], hp: 100, ammo: CONFIG.startAmmo };
-        let handState = { detected: false, x: 0.5, y: 0.5, angle: 0 };
+        let handState = { detected: false, x: 0.5, y: 0.5 };
 
         // --- MEDIAPIPE SETUP ---
         let hands;
         function setupMediaPipe() {
             hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-            hands.setOptions({
-                maxNumHands: 1,
-                modelComplexity: 0, 
-                minDetectionConfidence: 0.5,
-                minTrackingConfidence: 0.5
-            });
+            hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
             hands.onResults(onHandResults);
         }
 
@@ -219,33 +226,60 @@
                 if(gunEntity) gunEntity.setAttribute('visible', 'true');
 
                 const landmarks = results.multiHandLandmarks[0];
-                const wrist = landmarks[0];
+                // Landmark 8 = Ujung Telunjuk
                 const indexTip = landmarks[8];
+                const wrist = landmarks[0];
                 
+                // Simpan posisi normal (0-1)
                 handState.x = indexTip.x;
                 handState.y = indexTip.y;
-                cursor.style.left = `${handState.x * 100}%`;
-                cursor.style.top = `${handState.y * 100}%`;
 
-                const gunX = (wrist.x - 0.5) * 0.8; 
-                const gunY = -(wrist.y - 0.5) * 0.6 - 0.2; 
-                
-                const dx = indexTip.x - wrist.x;
-                const dy = indexTip.y - wrist.y;
-                const rotationZ = -Math.atan2(dx, dy) * (180 / Math.PI) + 90;
-                
+                // Update Cursor UI (Hijau)
+                cursor.style.left = `${indexTip.x * 100}%`;
+                cursor.style.top = `${indexTip.y * 100}%`;
+
+                // --- LOGIKA PISTOL 3D MENGIKUTI TANGAN ---
                 if (gunEntity) {
-                    gunEntity.object3D.position.x = gunX;
-                    gunEntity.object3D.position.y = gunY;
-                    gunEntity.object3D.rotation.z = THREE.Math.degToRad(rotationZ * 0.5); 
-                    const yaw = (handState.x - 0.5) * -1; 
-                    gunEntity.object3D.rotation.y = yaw;
+                    // Kalibrasi: Mapping dari MediaPipe (0..1) ke A-Frame Local Space (sekitar -0.5..0.5)
+                    // Kita ingin pistol bergerak sesuai posisi tangan di layar
+                    
+                    // Posisi X: (0.5 - wrist.x) karena kamera seringkali mirror
+                    // Kita coba direct mapping dulu. Jika tangan ke kanan (x > 0.5), pistol ke kanan.
+                    // A-Frame Camera: X+ Kanan, X- Kiri. Y+ Atas, Y- Bawah.
+                    // MediaPipe: X 0(kiri)..1(kanan). Y 0(atas)..1(bawah).
+                    
+                    // Mapping X: (0.5 - x) * Scale. Jika x=1 (kanan layar), result = -0.5 (Kiri di world?)
+                    // Perlu ditest. Biasanya MediaPipe Selfie Mode dimirror. AR.js back camera TIDAK mirror.
+                    // Jadi x=0 kiri, x=1 kanan.
+                    
+                    const mapX = (indexTip.x - 0.5) * 1.5; // Scale factor diperbesar biar jangkauan luas
+                    const mapY = -(indexTip.y - 0.5) * 1.2; // Y dibalik karena 0 di atas
+                    
+                    // Smooth Movement (Optional, tapi direct set lebih responsif)
+                    gunEntity.object3D.position.x = mapX;
+                    gunEntity.object3D.position.y = mapY - 0.2; // Sedikit di bawah jari
+
+                    // Rotasi agar selalu mengarah lurus ke depan (atau sedikit miring ikut tangan)
+                    // Kita hitung kemiringan tangan (wrist ke index) untuk rotasi Z (miring kiri/kanan)
+                    const dx = indexTip.x - wrist.x;
+                    const dy = indexTip.y - wrist.y;
+                    const angleRad = Math.atan2(dy, dx);
+                    const angleDeg = angleRad * (180 / Math.PI);
+                    
+                    // Rotasi Z pistol mengikuti kemiringan tangan
+                    gunEntity.object3D.rotation.z = THREE.Math.degToRad(angleDeg + 90); // Offset 90 karena pistol tegak
+                    
+                    // Rotasi Y dan X agar moncong pistol mengarah ke tengah layar (crosshair)
+                    // Ini memberikan efek "Aiming" yang realistis
+                    gunEntity.object3D.lookAt(0, 0, -10); // Selalu fokus ke depan jauh
                 }
+
             } else {
                 handState.detected = false;
                 cursor.classList.remove('active');
                 if(gunEntity) gunEntity.setAttribute('visible', 'false'); 
                 status.style.display = 'block';
+                status.innerText = "ARAHKAN TANGAN KE KAMERA";
             }
         }
 
@@ -261,8 +295,7 @@
                 const dz = zPos.z - camPos.z;
                 const dist = Math.sqrt(dx*dx + dz*dz);
 
-                // Chase Logic
-                if (dist > 5) { // Berhenti jika sangat dekat (5m)
+                if (dist > 5) { 
                     this.el.object3D.lookAt(camPos.x, zPos.y, camPos.z);
                     const dir = new THREE.Vector3();
                     dir.subVectors(camPos, zPos).normalize();
@@ -270,7 +303,6 @@
                     this.el.object3D.position.addScaledVector(dir, 0.08);
                 }
                 
-                // DAMAGE LOGIC (Jarak <= 8 meter)
                 if (dist <= CONFIG.damageDistance) {
                     if(!this.lastHit || Date.now() - this.lastHit > 1000) {
                         takeDamage(CONFIG.damageAmount);
@@ -289,8 +321,17 @@
             spawnWave();
             setInterval(updateRadar, 100);
             
-            window.addEventListener('click', shoot);
-            window.addEventListener('touchstart', (e) => { if(e.cancelable) e.preventDefault(); shoot(); }, {passive: false});
+            // Event Listeners
+            document.getElementById('fire-btn').addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Cegah ghost click
+                shoot();
+            });
+            document.getElementById('fire-btn').addEventListener('click', shoot);
+            
+            // Tap layar bebas juga bisa nembak
+            window.addEventListener('touchstart', (e) => { 
+                if(e.target.id !== 'fire-btn') shoot(); 
+            }, {passive: false});
         }
 
         function startCameraPipe() {
@@ -340,37 +381,33 @@
 
         function shoot() {
             if (!gameState.running) return;
-            
-            // AMMO CHECK
-            if (gameState.ammo <= 0) {
-                // Reload mechanic simple
-                // alert("Out of Ammo! Reloading..."); 
-                // Untuk game cepat, kita buat auto reload setelah delay singkat atau game over?
-                // Sesuai request: limit ammo. Jika 0 gak bisa nembak.
-                return; 
-            }
+            if (gameState.ammo <= 0) return;
 
             gameState.ammo--;
             updateHUD();
 
-            // Gun Animation
+            // 1. Gun Animation (Recoil)
             const gunEntity = document.getElementById('player-gun');
             if(gunEntity) {
-                gunEntity.object3D.position.z += 0.1;
+                gunEntity.object3D.position.z += 0.2; // Mundur
                 const flash = document.getElementById('muzzle-flash-3d');
                 if(flash) flash.setAttribute('visible', 'true');
                 setTimeout(() => {
-                    gunEntity.object3D.position.z -= 0.1;
+                    gunEntity.object3D.position.z -= 0.2; // Maju lagi
                     if(flash) flash.setAttribute('visible', 'false');
                 }, 80);
             }
 
-            // Raycast
+            // 2. Raycasting Logic
             const raycaster = new THREE.Raycaster();
             const camera = document.querySelector('[gps-camera]').object3D.children[0];
             
+            // Default tembak tengah jika tangan tidak terdeteksi
             let aimX = 0, aimY = 0;
+            
+            // Jika tangan terdeteksi, gunakan posisi jari untuk menembak
             if (handState.detected) {
+                // Convert 0..1 to -1..1 (NDC)
                 aimX = (handState.x * 2) - 1;
                 aimY = -(handState.y * 2) + 1;
             }
@@ -379,8 +416,12 @@
             const intersects = raycaster.intersectObjects(document.querySelector('a-scene').object3D.children, true);
             
             for (let i = 0; i < intersects.length; i++) {
-                let parent = intersects[i].object.el;
+                let obj = intersects[i].object;
+                // Ignore Gun itself (cek nama atau id)
+                // Gunakan logika parent zombie
+                let parent = obj.el;
                 while (parent && !parent.classList.contains('zombie')) parent = parent.parentNode;
+                
                 if (parent && parent.classList.contains('zombie') && parent.dataset.dead !== "true") {
                     killZombie(parent);
                     break;
