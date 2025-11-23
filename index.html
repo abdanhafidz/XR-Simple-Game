@@ -2,11 +2,10 @@
 <html>
 <head>
     <meta charset='utf-8'>
-    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>AR Zombie Shooter: Cyberpunk Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR Zombie Shooter: Final Fix</title>
     
-    <!-- Libraries -->
+    <!-- A-Frame & AR.js -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js'></script>
     <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
@@ -17,157 +16,101 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <!-- Font Cyberpunk -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     
     <style>
-        /* RESET */
-        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Orbitron', sans-serif; }
         
+        /* Paksa Video Fullscreen & Di Belakang */
         #arjs-video, video {
-            width: 100% !important; height: 100% !important;
-            top: 0 !important; left: 0 !important;
-            z-index: -2 !important; object-fit: cover !important;
-            margin: 0 !important; position: absolute !important;
+            width: 100vw !important; height: 100vh !important;
+            position: absolute !important; top: 0; left: 0;
+            z-index: -1 !important; object-fit: cover !important;
         }
 
-        /* UI LAYER */
+        /* UI Container */
         #ui-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 999;
+            pointer-events: none; z-index: 100;
             display: flex; flex-direction: column; justify-content: space-between;
         }
 
-        /* Damage Overlay */
-        #damage-flash {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle, transparent 30%, rgba(255, 0, 0, 0.9) 100%);
-            opacity: 0; transition: opacity 0.1s; pointer-events: none; z-index: 900;
-            mix-blend-mode: overlay;
-        }
-
-        /* HUD STYLES */
-        .hud-top { 
-            display: flex; justify-content: space-between; padding: 20px; 
-            padding-top: max(20px, env(safe-area-inset-top));
-        }
-        
+        /* --- HUD ELEMENTS (CYBERPUNK) --- */
         .hud-panel {
-            background: rgba(0, 15, 30, 0.85);
-            border: 1px solid rgba(0, 255, 255, 0.6);
-            padding: 10px 25px;
+            background: rgba(0, 20, 40, 0.8);
+            border: 2px solid #00ffff;
+            padding: 10px 20px;
             transform: skewX(-15deg);
-            display: flex; flex-direction: column; align-items: center;
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
-            backdrop-filter: blur(5px);
+            box-shadow: 0 0 15px #00ffff;
+            margin: 10px;
+        }
+        .hud-text {
+            color: #fff; font-size: 20px; transform: skewX(15deg);
+            text-shadow: 0 0 5px #00ffff;
+        }
+        .hud-label {
+            font-family: 'Share Tech Mono'; font-size: 12px; color: #00ffff;
+            display: block; margin-bottom: 2px;
         }
 
-        .hud-content { transform: skewX(15deg); text-align: center; }
+        .top-row { display: flex; justify-content: space-between; padding-top: 20px; }
+        .bottom-row { display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 20px; }
 
-        .hud-label { 
-            font-family: 'Share Tech Mono', monospace; font-size: 10px; 
-            color: #00ffff; letter-spacing: 2px; text-shadow: 0 0 5px #00ffff;
+        /* Health Bar */
+        .hp-container { width: 200px; margin-left: 20px; transform: skewX(-15deg); }
+        .hp-bar-bg { width: 100%; height: 20px; background: #300; border: 2px solid #ff0000; }
+        .hp-bar-fill { width: 100%; height: 100%; background: #ff0000; transition: width 0.2s; box-shadow: 0 0 10px #f00; }
+
+        /* CROSSHAIR (CURSOR) */
+        #aim-cursor {
+            position: absolute; width: 60px; height: 60px;
+            border: 3px solid #0f0; border-radius: 50%;
+            transform: translate(-50%, -50%);
+            top: 50%; left: 50%;
+            box-shadow: 0 0 20px #0f0;
+            transition: all 0.1s; /* Smooth movement */
+            display: flex; align-items: center; justify-content: center;
         }
+        #aim-cursor::after { content: ''; width: 8px; height: 8px; background: #0f0; }
         
-        .hud-value { 
-            font-family: 'Orbitron', sans-serif; font-size: 28px; 
-            color: #fff; font-weight: 900; text-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+        /* DEBUG DOT (Titik Merah Asli AI) */
+        #debug-dot {
+            position: absolute; width: 10px; height: 10px; background: red;
+            border-radius: 50%; transform: translate(-50%, -50%);
+            display: none; /* Nyalakan di script kalau mau debug */
         }
 
-        .panel-kills { border-left: 5px solid #00ffff; }
-        .panel-wave { border-right: 5px solid #ffaa00; }
-        .panel-wave .hud-label { color: #ffaa00; text-shadow: 0 0 5px #ffaa00; }
-        .panel-wave .hud-value { color: #ffaa00; }
-
-        /* BOTTOM HUD */
-        .hud-bottom {
-            display: flex; align-items: flex-end; justify-content: space-between; 
-            padding: 20px; padding-bottom: max(30px, env(safe-area-inset-bottom));
-        }
-
-        /* HEALTH BAR */
-        .health-container { width: 200px; transform: skewX(-15deg); }
-        .health-bar-bg { 
-            width: 100%; height: 15px; background: rgba(50, 0, 0, 0.8); 
-            border: 2px solid #ff0000; box-shadow: 0 0 10px #ff0000;
-        }
-        .health-bar-fill { 
-            width: 100%; height: 100%; background: #ff0000; 
-            box-shadow: inset 0 0 10px #500; transition: width 0.2s;
-        }
-        .health-label { 
-            color: #fff; font-family: 'Orbitron'; font-size: 12px; 
-            margin-bottom: 5px; text-shadow: 0 0 5px #ff0000; transform: skewX(15deg);
-        }
-
-        /* AMMO */
-        .panel-ammo { 
-            border-right: 5px solid #ff0000; background: rgba(20, 0, 0, 0.85); 
-            border-color: rgba(255, 0, 0, 0.6);
-        }
-        .panel-ammo .hud-label { color: #ff5555; text-shadow: 0 0 5px #ff0000; }
-        .panel-ammo .hud-value { color: #ff0000; font-size: 36px; }
-
-        /* CURSOR & HAND STATUS */
-        .crosshair {
-            position: absolute; width: 60px; height: 60px; 
-            border: 2px dashed #0f0; border-radius: 50%;
-            transform: translate(-50%, -50%); 
-            opacity: 0; /* Muncul kalau tangan ada */
-            box-shadow: 0 0 20px #0f0; pointer-events: none;
-            display: flex; align-items: center; justify-content: center;
-            transition: opacity 0.2s;
-        }
-        .crosshair.active { opacity: 1; }
-        .crosshair::after { 
-            content: ''; width: 10px; height: 10px; 
-            background: #0f0; border-radius: 50%; 
-            box-shadow: 0 0 10px #fff;
-        }
-
-        #hand-status {
-            position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%);
-            font-family: 'Share Tech Mono'; color: rgba(0, 255, 255, 0.8); font-size: 12px;
-            text-align: center; text-shadow: 0 0 5px #000; pointer-events: none;
-            background: rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 4px;
-        }
-
-        /* RADAR */
-        .radar-box {
-            position: absolute; bottom: 100px; left: 20px;
-            width: 100px; height: 100px; border: 2px solid #0f0; border-radius: 50%;
-            background: rgba(0, 20, 0, 0.8); overflow: hidden;
-            box-shadow: 0 0 10px #0f0; pointer-events: auto;
-        }
-        .radar-center { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: #fff; transform: translate(-50%, -50%); border-radius: 50%; }
-        .radar-blip { position: absolute; width: 6px; height: 6px; background: red; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 4px #fff; }
-
-        /* BUTTONS */
+        /* BUTTONS & STATUS */
         #fire-btn {
-            position: absolute; bottom: 120px; right: 30px;
-            width: 90px; height: 90px; border-radius: 50%;
-            background: rgba(255, 0, 0, 0.3); border: 3px solid #ff0000;
+            position: absolute; bottom: 100px; right: 20px;
+            width: 90px; height: 90px; background: rgba(255,0,0,0.3);
+            border: 3px solid #f00; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            font-family: 'Orbitron'; color: white; font-weight: bold; font-size: 16px;
-            box-shadow: 0 0 20px rgba(255, 0, 0, 0.5); pointer-events: auto; z-index: 1000;
+            color: white; font-size: 18px; pointer-events: auto;
+            box-shadow: 0 0 20px #f00;
         }
-        #fire-btn:active { background: rgba(255, 0, 0, 0.8); transform: scale(0.95); }
+        #fire-btn:active { background: #f00; transform: scale(0.95); }
 
-        /* SCREENS */
-        .fullscreen-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); z-index: 2000;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            text-align: center; pointer-events: auto;
+        #status-msg {
+            position: absolute; top: 60%; width: 100%; text-align: center;
+            color: #0ff; font-family: 'Share Tech Mono'; font-size: 14px;
+            text-shadow: 0 0 5px #000; background: rgba(0,0,0,0.5); padding: 5px;
         }
-        .btn-start {
-            background: linear-gradient(45deg, #cc0000, #990000);
-            color: #fff; padding: 15px 40px; border: none;
-            font-family: 'Orbitron'; font-weight: 900; font-size: 20px;
-            clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
-            letter-spacing: 2px; cursor: pointer; margin-top: 20px;
-            box-shadow: 0 0 20px rgba(255, 0, 0, 0.4);
+
+        /* Radar */
+        .radar {
+            position: absolute; bottom: 20px; left: 20px;
+            width: 100px; height: 100px; border: 2px solid #0f0; border-radius: 50%;
+            background: rgba(0, 20, 0, 0.7); overflow: hidden;
         }
+        .radar-blip { position: absolute; width: 6px; height: 6px; background: red; border-radius: 50%; }
+
+        /* Fullscreen Overlays */
+        .screen { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: auto; }
+        .btn-main { background: linear-gradient(45deg, #c00, #900); color: #fff; border: none; padding: 15px 40px; font-family: 'Orbitron'; font-size: 20px; margin-top: 20px; clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%); cursor: pointer; }
+    
+        #damage-flash { position: absolute; width: 100%; height: 100%; background: radial-gradient(transparent 50%, red); opacity: 0; pointer-events: none; transition: 0.2s; mix-blend-mode: multiply; z-index: 800; }
     </style>
 </head>
 
@@ -175,66 +118,64 @@
     <div id="damage-flash"></div>
 
     <div id="ui-layer">
-        <div class="hud-top">
-            <div class="hud-panel panel-kills">
-                <div class="hud-content">
-                    <div class="hud-label">KILLS</div>
-                    <div class="hud-value" id="score">0</div>
-                </div>
+        <div class="top-row">
+            <div class="hud-panel" style="border-color: #0ff;">
+                <span class="hud-label">KILLS</span>
+                <span class="hud-text" id="score">0</span>
             </div>
-            <div class="hud-panel panel-wave">
-                <div class="hud-content">
-                    <div class="hud-label">WAVE</div>
-                    <div class="hud-value" id="wave">1</div>
-                </div>
+            <div class="hud-panel" style="border-color: #fa0;">
+                <span class="hud-label">WAVE</span>
+                <span class="hud-text" id="wave">1</span>
             </div>
         </div>
 
-        <!-- Cursor Hijau -->
-        <div class="crosshair" id="finger-cursor"></div>
-        <div id="hand-status">LOADING AI...<br>Arahkan Jari Telunjuk</div>
-        
-        <div class="radar-box" id="radar"><div class="radar-center"></div></div>
-        <div id="fire-btn">SHOOT</div>
+        <!-- AIMING -->
+        <div id="aim-cursor"></div>
+        <div id="debug-dot"></div> <!-- Titik Raw MediaPipe -->
+        <div id="status-msg">LOADING AI...</div>
 
-        <div class="hud-bottom">
-            <div class="health-container">
-                <div class="health-label">HP INTEGRITY</div>
-                <div class="health-bar-bg"><div class="health-bar-fill" id="hp-bar"></div></div>
+        <div class="radar" id="radar"></div>
+        <div id="fire-btn">FIRE</div>
+
+        <div class="bottom-row">
+            <div class="hp-container">
+                <span class="hud-label" style="color:#fff; margin-left: 10px;">HP INTEGRITY</span>
+                <div class="hp-bar-bg"><div class="hp-bar-fill" id="hp-bar"></div></div>
             </div>
-            <div class="hud-panel panel-ammo">
-                <div class="hud-content">
-                    <div class="hud-label">AMMO</div>
-                    <div class="hud-value" id="ammo">25</div>
-                </div>
+            <div class="hud-panel" style="border-color: #f00;">
+                <span class="hud-label" style="color:#f55">AMMO</span>
+                <span class="hud-text" style="color:#f00" id="ammo">25</span>
             </div>
         </div>
     </div>
 
-    <!-- Start Screen -->
-    <div id="start-screen" class="fullscreen-overlay">
-        <h1 style="font-family:'Orbitron'; color:red; font-size: 40px; text-shadow: 0 0 20px red;">ZOMBIE PROTOCOL</h1>
-        <p style="color:#aaa; font-family:'Share Tech Mono'; margin-bottom: 30px;">
-            [ HAND TRACKING AIM ]<br>
-            1. PISTOL IKUT TANGAN<br>
-            2. KURSOR HIJAU = TITIK TEMBAK<br>
-            3. TAP LAYAR UNTUK MENEMBAK
+    <!-- START SCREEN -->
+    <div id="start-screen" class="screen">
+        <h1 style="color:red; font-size:40px; text-shadow:0 0 20px red; margin-bottom:10px;">ZOMBIE PROTOCOL</h1>
+        <p style="color:#aaa; font-family:'Share Tech Mono';">
+            HAND TRACKING: ON<br>
+            1. GUNAKAN TANGAN KANAN<br>
+            2. KURSOR HIJAU MENGIKUTI TELUNJUK<br>
+            3. TARGET ZOMBIE & TAP TOMBOL FIRE
         </p>
-        <button class="btn-start" onclick="startGame()">INITIATE</button>
+        <button class="btn-main" onclick="game.start()">DEPLOY</button>
+        <p style="font-size:10px; color:#555; margin-top:20px;">v4.0 Final Fix</p>
     </div>
 
-    <div id="game-over-screen" class="fullscreen-overlay" style="display: none;">
-        <h1 style="font-family:'Orbitron'; color:red; font-size: 40px;">FATAL ERROR</h1>
-        <p style="color:white; margin-bottom: 20px;">OPERATOR KILLED IN ACTION</p>
-        <button class="btn-start" onclick="location.reload()">REBOOT SYSTEM</button>
+    <div id="game-over" class="screen" style="display:none;">
+        <h1 style="color:red;">YOU DIED</h1>
+        <p style="color:white;">KILLS: <span id="final-score">0</span></p>
+        <button class="btn-main" onclick="location.reload()">RETRY</button>
     </div>
 
-    <a-scene
-        vr-mode-ui="enabled: false"
-        renderer="logarithmicDepthBuffer: true; precision: high;"
-        arjs='sourceType: webcam; videoTexture: true; debugUIEnabled: false;'
+    <!-- AR SCENE -->
+    <a-scene 
+        vr-mode-ui="enabled: false" 
+        renderer="logarithmicDepthBuffer: true;" 
+        arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
         loading-screen="enabled: false">
 
+        <!-- ASSETS: Titan Zombie -->
         <a-assets>
             <a-asset-item id="titan-model" src="https://raw.githack.com/KhronosGroup/glTF-Sample-Models/master/2.0/CesiumMan/glTF-Binary/CesiumMan.glb"></a-asset-item>
         </a-assets>
@@ -243,289 +184,327 @@
         <a-light type="directional" color="#fff" intensity="2" position="1 1 0"></a-light>
 
         <a-camera gps-camera rotation-reader far="5000">
-            <!-- PISTOL 3D (Cosmetic) -->
-            <!-- Mengikuti tangan via script -->
-            <a-entity id="player-gun" position="0.3 -0.4 -0.8" rotation="0 0 0" scale="3 3 3" visible="false">
-                <a-box color="#111" width="0.08" height="0.12" depth="0.3" position="0 0 0"></a-box>
-                <a-cylinder color="#333" radius="0.03" height="0.4" rotation="90 0 0" position="0 0.05 -0.2"></a-cylinder>
-                <a-box color="#0ff" width="0.09" height="0.02" depth="0.3" position="0 0.07 0" material="emissive: #0ff; emissiveIntensity: 3"></a-box>
-                <a-box color="#222" width="0.06" height="0.15" depth="0.08" position="0 -0.1 0.1" rotation="-20 0 0"></a-box>
-                <!-- Laser Merah dari Pistol -->
-                <a-cylinder color="red" radius="0.002" height="50" rotation="90 0 0" position="0 0.05 -25" opacity="0.6" material="emissive: red; emissiveIntensity: 1"></a-cylinder>
-                <a-sphere id="muzzle-flash" color="orange" radius="0.15" position="0 0.05 -0.5" visible="false" material="emissive: orange; emissiveIntensity: 5"></a-sphere>
+            <!-- GUN 3D (Visual Only) -->
+            <a-entity id="gun-rig" position="0.4 -0.4 -0.8" rotation="0 0 0" scale="2.5 2.5 2.5">
+                <a-box color="#111" width="0.1" height="0.15" depth="0.4"></a-box> <!-- Body -->
+                <a-cylinder color="#333" radius="0.03" height="0.5" rotation="90 0 0" position="0 0.05 -0.2"></a-cylinder> <!-- Barrel -->
+                <a-box color="#0ff" width="0.11" height="0.02" depth="0.4" position="0 0.08 0" material="emissive:#0ff; emissiveIntensity:2"></a-box> <!-- Neon -->
+                <a-box color="#222" width="0.08" height="0.2" depth="0.1" position="0 -0.15 0.15" rotation="-20 0 0"></a-box> <!-- Handle -->
+                <a-sphere id="muzzle" color="orange" radius="0.15" position="0 0.05 -0.5" visible="false" material="emissive:orange; emissiveIntensity:5"></a-sphere>
             </a-entity>
         </a-camera>
     </a-scene>
 
     <script>
-        // CONFIG
-        const CONFIG = {
-            spawnDistMin: 60, spawnDistMax: 100, 
-            modelScale: 30, yOffset: -35, // Titan Settings
-            radarScale: 0.3,
-            damageDistance: 10.0,
-            damageAmount: 10,
-            startAmmo: 30,
-            gunSensitivityX: 4.0,
-            gunSensitivityY: 3.0
+        // --- GAME SYSTEM ---
+        const game = {
+            running: false,
+            score: 0, wave: 1, hp: 100, ammo: 30,
+            zombies: [],
+            
+            // Config
+            spawnDist: { min: 40, max: 80 }, // Jauh
+            damageDist: 10, // Jarak pukul
+            radarScale: 0.4,
+            
+            start: function() {
+                document.getElementById('start-screen').style.display = 'none';
+                this.running = true;
+                ai.init();
+                this.spawnWave();
+                this.loop();
+                
+                // Fire Controls
+                const btn = document.getElementById('fire-btn');
+                btn.addEventListener('touchstart', (e) => { e.preventDefault(); this.shoot(); });
+                btn.addEventListener('mousedown', (e) => { e.preventDefault(); this.shoot(); });
+                window.addEventListener('touchstart', (e) => { if(e.target.id !== 'fire-btn') this.shoot(); });
+            },
+
+            loop: function() {
+                if(!this.running) return;
+                requestAnimationFrame(() => this.loop());
+                this.updateRadar();
+            },
+
+            spawnWave: function() {
+                for(let i=0; i<2; i++) this.spawnZombie(); // 2 Zombie per wave awal
+            },
+
+            spawnZombie: function() {
+                const scene = document.querySelector('a-scene');
+                const el = document.createElement('a-entity');
+                el.classList.add('zombie');
+                
+                // Random Posisi Relatif Kamera
+                const cam = document.querySelector('[gps-camera]').object3D;
+                const angle = Math.random() * Math.PI * 2;
+                const dist = this.spawnDist.min + Math.random() * (this.spawnDist.max - this.spawnDist.min);
+                const x = cam.position.x + Math.sin(angle) * dist;
+                const z = cam.position.z + Math.cos(angle) * dist;
+
+                el.setAttribute('position', `${x} -30 ${z}`); // Y = -30 (Menapak jauh di bawah)
+                el.setAttribute('titan-behavior', ''); // Logic AI
+
+                // Model Visual
+                const model = document.createElement('a-entity');
+                model.setAttribute('gltf-model', '#titan-model');
+                model.setAttribute('scale', '30 30 30'); // RAKSASA
+                model.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1.5');
+                el.appendChild(model);
+
+                // HITBOX RAKSASA (Invisible) - Agar gampang ditembak
+                const hitbox = document.createElement('a-box');
+                hitbox.setAttribute('material', 'visible: false');
+                hitbox.classList.add('hitbox'); // Class khusus raycast
+                hitbox.setAttribute('scale', '10 40 10'); // Lebar 10, Tinggi 40
+                hitbox.setAttribute('position', '0 20 0');
+                el.appendChild(hitbox);
+
+                scene.appendChild(el);
+                this.zombies.push(el);
+            },
+
+            shoot: function() {
+                if(this.ammo <= 0) return;
+                this.ammo--; this.updateUI();
+
+                // 1. Gun Visual Recoil
+                const gun = document.getElementById('gun-rig');
+                const muzzle = document.getElementById('muzzle');
+                if(gun) {
+                    gun.object3D.position.z += 0.3; // Mundur
+                    gun.object3D.rotation.x += 0.1; // Nungging dikit
+                    muzzle.setAttribute('visible', 'true');
+                    setTimeout(() => {
+                        gun.object3D.position.z -= 0.3;
+                        gun.object3D.rotation.x -= 0.1;
+                        muzzle.setAttribute('visible', 'false');
+                    }, 80);
+                }
+
+                // 2. Raycasting Logic (SCREEN TO WORLD)
+                // Tembak dari posisi kursor hijau di layar
+                const raycaster = new THREE.Raycaster();
+                const cam = document.querySelector('[gps-camera]').object3D.children[0];
+                
+                // Ambil posisi kursor (0-100%) konversi ke NDC (-1 to 1)
+                const cursorEl = document.getElementById('aim-cursor');
+                const rect = cursorEl.getBoundingClientRect();
+                
+                // Hitung titik tengah kursor relatif window
+                const x = (rect.left + rect.width/2) / window.innerWidth;
+                const y = (rect.top + rect.height/2) / window.innerHeight;
+
+                const ndcX = (x * 2) - 1;
+                const ndcY = -(y * 2) + 1; // Y terbalik
+
+                raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), cam);
+
+                // Cari yang kena 'hitbox'
+                const intersects = raycaster.intersectObjects(document.querySelector('a-scene').object3D.children, true);
+                
+                for(let hit of intersects) {
+                    let parent = hit.object.el;
+                    // Traverse naik cari zombie
+                    while(parent && !parent.classList.contains('zombie')) {
+                        parent = parent.parentNode;
+                    }
+                    
+                    if(parent && parent.dataset.dead !== "true") {
+                        this.killZombie(parent);
+                        break;
+                    }
+                }
+            },
+
+            killZombie: function(el) {
+                el.dataset.dead = "true";
+                // Animasi Jatuh
+                el.setAttribute('animation', 'property: rotation; to: -90 0 0; dur: 1000; easing: easeOutQuad');
+                
+                this.score++;
+                this.updateUI();
+                
+                setTimeout(() => {
+                    if(el.parentNode) el.parentNode.removeChild(el);
+                    this.zombies = this.zombies.filter(z => z !== el);
+                    if(this.zombies.length < 2) this.spawnZombie();
+                }, 1500);
+            },
+
+            takeDamage: function(amt) {
+                this.hp -= amt;
+                this.updateUI();
+                const flash = document.getElementById('damage-flash');
+                flash.style.opacity = 1; setTimeout(() => flash.style.opacity = 0, 200);
+                
+                if(this.hp <= 0) {
+                    this.running = false;
+                    document.getElementById('game-over').style.display = 'flex';
+                    document.getElementById('final-score').innerText = this.score;
+                }
+            },
+
+            updateUI: function() {
+                document.getElementById('score').innerText = this.score;
+                document.getElementById('ammo').innerText = this.ammo;
+                document.getElementById('hp-bar').style.width = Math.max(0, this.hp) + "%";
+            },
+
+            updateRadar: function() {
+                const radar = document.getElementById('radar');
+                // Hapus blip lama (kecuali center)
+                Array.from(radar.children).forEach(c => { if(c.className === 'radar-blip') c.remove(); });
+                
+                const cam = document.querySelector('[gps-camera]').object3D;
+                const angle = cam.rotation.y;
+
+                this.zombies.forEach(z => {
+                    if(z.dataset.dead === "true") return;
+                    const pos = z.object3D.position;
+                    const dx = pos.x - cam.position.x;
+                    const dz = pos.z - cam.position.z;
+                    
+                    // Rotasi 2D
+                    const rx = dx * Math.cos(angle) - dz * Math.sin(angle);
+                    const rz = dx * Math.sin(angle) + dz * Math.cos(angle);
+                    
+                    // 50 = radius radar (setengah dari 100px)
+                    const px = 50 + (rx * this.radarScale);
+                    const py = 50 + (rz * this.radarScale);
+
+                    if((px-50)**2 + (py-50)**2 < 50**2) {
+                        const b = document.createElement('div');
+                        b.className = 'radar-blip';
+                        b.style.left = px + 'px';
+                        b.style.top = py + 'px';
+                        radar.appendChild(b);
+                    }
+                });
+            }
         };
 
-        let gameState = { running: false, score: 0, wave: 1, zombies: [], hp: 100, ammo: CONFIG.startAmmo };
-        let handData = { x: 0.5, y: 0.5, detected: false };
-
-        // --- HAND TRACKING ---
-        let hands;
-        function setupMediaPipe() {
-            hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-            hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-            hands.onResults(onHandResults);
-        }
-
-        function onHandResults(results) {
-            const cursor = document.getElementById('finger-cursor');
-            const status = document.getElementById('hand-status');
-            const gun = document.getElementById('player-gun');
-
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                handData.detected = true;
-                status.style.display = 'none';
-                cursor.classList.add('active');
-                if(gun) gun.setAttribute('visible', 'true');
-
-                const landmarks = results.multiHandLandmarks[0];
-                const indexTip = landmarks[8]; 
-                const wrist = landmarks[0]; 
+        // --- AI HAND TRACKING SYSTEM ---
+        const ai = {
+            hands: null,
+            video: null,
+            
+            init: function() {
+                const status = document.getElementById('hand-status');
                 
-                handData.x = indexTip.x;
-                handData.y = indexTip.y;
+                this.hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+                this.hands.setOptions({
+                    maxNumHands: 1,
+                    modelComplexity: 0, // Lite
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+                this.hands.onResults(this.onResults);
+                
+                this.findVideo();
+            },
 
-                // Update Kursor Hijau 2D
-                cursor.style.left = `${indexTip.x * 100}%`;
-                cursor.style.top = `${indexTip.y * 100}%`;
-
-                // Update Pistol 3D
-                if (gun) {
-                    const gunX = (wrist.x - 0.5) * CONFIG.gunSensitivityX;
-                    const gunY = -(wrist.y - 0.5) * CONFIG.gunSensitivityY;
-                    
-                    gun.object3D.position.x = gunX + 0.2; 
-                    gun.object3D.position.y = gunY - 0.3; 
-                    
-                    const dx = indexTip.x - wrist.x;
-                    const dy = indexTip.y - wrist.y;
-                    const angleDeg = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
-                    
-                    gun.object3D.rotation.z = THREE.Math.degToRad(angleDeg); 
-                    gun.object3D.rotation.y = (handData.x - 0.5) * -1.0; 
-                    gun.object3D.rotation.x = (handData.y - 0.5) * 0.8;  
+            findVideo: function() {
+                // Cari video yang dibuat AR.js
+                const v = document.querySelector('video');
+                if(v && v.readyState >= 2) {
+                    this.video = v;
+                    this.process();
+                } else {
+                    setTimeout(() => this.findVideo(), 500);
                 }
+            },
 
-            } else {
-                handData.detected = false;
-                cursor.classList.remove('active');
-                if(gun) {
-                    gun.object3D.position.set(0.3, -0.5, -0.8);
-                    gun.object3D.rotation.set(0, 0, 0);
+            process: function() {
+                if(!game.running) return;
+                ai.hands.send({image: ai.video}).then(() => {
+                    requestAnimationFrame(() => ai.process());
+                });
+            },
+
+            onResults: function(res) {
+                const cursor = document.getElementById('aim-cursor');
+                const status = document.getElementById('hand-status');
+                const gun = document.getElementById('gun-rig');
+
+                if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
+                    status.style.display = 'none';
+                    cursor.style.opacity = 1;
+                    if(gun) gun.setAttribute('visible', 'true');
+
+                    const marks = res.multiHandLandmarks[0];
+                    const index = marks[8]; // Telunjuk
+                    const wrist = marks[0];
+
+                    // 1. Gerakkan Kursor Hijau (Mapping 0..1 ke % Layar)
+                    cursor.style.left = (index.x * 100) + "%";
+                    cursor.style.top = (index.y * 100) + "%";
+
+                    // 2. Gerakkan Pistol 3D (Biar terlihat nempel tangan)
+                    if(gun) {
+                        // Mapping koordinat layar ke koordinat kamera A-Frame
+                        // X: 0..1 -> -1..1 (approx)
+                        const gunX = (wrist.x - 0.5) * 3; 
+                        const gunY = -(wrist.y - 0.5) * 2 - 0.3;
+                        
+                        gun.object3D.position.x = gunX;
+                        gun.object3D.position.y = gunY;
+
+                        // Rotasi Pistol ikut arah telunjuk
+                        const dx = index.x - wrist.x;
+                        const dy = index.y - wrist.y;
+                        const rotZ = Math.atan2(dy, dx) * (180/Math.PI) + 90;
+                        
+                        gun.object3D.rotation.z = THREE.Math.degToRad(rotZ);
+                        // Sedikit nengok ke arah kursor
+                        gun.object3D.rotation.y = (index.x - 0.5) * -1.5;
+                    }
+
+                } else {
+                    // Tangan hilang
+                    status.style.display = 'block';
+                    status.innerText = "TANGAN TIDAK TERDETEKSI";
+                    cursor.style.opacity = 0.3; // Redupkan kursor
+                    // if(gun) gun.setAttribute('visible', 'false'); // Jangan hide biar ga flickering
                 }
-                status.style.display = 'block';
-                status.innerText = "TANGAN HILANG!";
             }
-        }
+        };
 
-        // --- TITAN AI ---
-        AFRAME.registerComponent('titan-ai', {
-            init: function() { this.el.object3D.position.y = CONFIG.yOffset; },
+        // --- ZOMBIE BEHAVIOR ---
+        AFRAME.registerComponent('titan-behavior', {
+            init: function() {
+                this.speed = 0.15; 
+                this.damageTime = 0;
+            },
             tick: function() {
-                if (!gameState.running || this.el.dataset.dead === "true") return;
+                if (!game.running || this.el.dataset.dead === "true") return;
+
                 const zPos = this.el.object3D.position;
-                const camPos = document.querySelector('[gps-camera]').object3D.position;
+                const cam = document.querySelector('[gps-camera]').object3D.position;
                 
-                const dx = zPos.x - camPos.x;
-                const dz = zPos.z - camPos.z;
+                // Hitung jarak (Horizontal Only)
+                const dx = zPos.x - cam.x;
+                const dz = zPos.z - cam.z;
                 const dist = Math.sqrt(dx*dx + dz*dz);
 
-                if (dist > 5) {
-                    this.el.object3D.lookAt(camPos.x, zPos.y, camPos.z);
-                    const dir = new THREE.Vector3(dx, 0, dz).normalize().negate(); 
-                    this.el.object3D.position.addScaledVector(dir, 0.2); 
+                // Chase
+                if (dist > 8) {
+                    this.el.object3D.lookAt(cam.x, zPos.y, cam.z);
+                    const dir = new THREE.Vector3(dx, 0, dz).normalize().negate();
+                    this.el.object3D.position.addScaledVector(dir, this.speed);
                 }
 
-                if (dist <= CONFIG.damageDistance) {
-                    if (!this.lastHit || Date.now() - this.lastHit > 1000) {
-                        takeDamage(15);
-                        this.lastHit = Date.now();
+                // Attack
+                if (dist <= game.damageDist) {
+                    const now = Date.now();
+                    if (now - this.damageTime > 1000) {
+                        game.takeDamage(10);
+                        this.damageTime = now;
                     }
                 }
             }
         });
-
-        // --- GAME LOGIC ---
-        function startGame() {
-            document.getElementById('start-screen').style.display = 'none';
-            gameState.running = true;
-            setupMediaPipe();
-            processVideo();
-            spawnWave();
-            setInterval(updateRadar, 100);
-
-            const fireBtn = document.getElementById('fire-btn');
-            fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); shoot(); });
-            fireBtn.addEventListener('mousedown', (e) => { e.preventDefault(); shoot(); });
-            
-            window.addEventListener('touchstart', (e) => { 
-                if(e.target.id !== 'fire-btn') shoot(); 
-            }, {passive: false});
-        }
-
-        function processVideo() {
-            const video = document.querySelector('video');
-            if (video && video.readyState >= 2) {
-                hands.send({image: video}).then(() => {
-                    if (gameState.running) requestAnimationFrame(processVideo);
-                });
-            } else {
-                requestAnimationFrame(processVideo);
-            }
-        }
-
-        function spawnWave() { for(let i=0; i<2; i++) spawnTitan(); }
-
-        function spawnTitan() {
-            const scene = document.querySelector('a-scene');
-            const zombie = document.createElement('a-entity');
-            zombie.setAttribute('titan-ai', '');
-            zombie.classList.add('zombie');
-
-            const cam = document.querySelector('[gps-camera]').object3D;
-            const angle = Math.random() * Math.PI * 2;
-            const dist = CONFIG.spawnDistMin + Math.random() * (CONFIG.spawnDistMax - CONFIG.spawnDistMin);
-            
-            zombie.setAttribute('position', {
-                x: cam.position.x + Math.sin(angle) * dist,
-                y: CONFIG.yOffset,
-                z: cam.position.z + Math.cos(angle) * dist
-            });
-
-            const model = document.createElement('a-entity');
-            model.setAttribute('gltf-model', '#titan-model');
-            model.setAttribute('scale', `${CONFIG.modelScale} ${CONFIG.modelScale} ${CONFIG.modelScale}`);
-            model.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1.5');
-            zombie.appendChild(model);
-
-            // HITBOX RAKSASA (Cube Invisible di sekitar model)
-            const hitbox = document.createElement('a-box');
-            hitbox.setAttribute('material', 'visible: false'); // Invisible
-            hitbox.setAttribute('scale', '8 35 8'); // Besar & Tinggi
-            hitbox.setAttribute('position', '0 15 0'); // Offset ke atas agar menutupi badan
-            hitbox.classList.add('hitbox'); 
-            zombie.appendChild(hitbox);
-
-            scene.appendChild(zombie);
-            gameState.zombies.push(zombie);
-        }
-
-        function shoot() {
-            if (!gameState.running || gameState.ammo <= 0) return;
-            gameState.ammo--; updateHUD();
-
-            // Recoil
-            const gun = document.getElementById('player-gun');
-            if(gun) {
-                gun.object3D.position.z += 0.2;
-                document.getElementById('muzzle-flash').setAttribute('visible', 'true');
-                setTimeout(() => {
-                    gun.object3D.position.z -= 0.2;
-                    document.getElementById('muzzle-flash').setAttribute('visible', 'false');
-                }, 50);
-            }
-
-            // SHOOT LOGIC (FIXED)
-            // Tembak dari Kamera -> Menuju Kursor Hijau
-            const raycaster = new THREE.Raycaster();
-            const camera = document.querySelector('[gps-camera]').object3D.children[0];
-            
-            // Konversi posisi kursor tangan ke NDC (-1..1)
-            let aimX = 0, aimY = 0;
-            if (handData.detected) {
-                aimX = (handData.x * 2) - 1;
-                aimY = -(handData.y * 2) + 1;
-            }
-
-            raycaster.setFromCamera(new THREE.Vector2(aimX, aimY), camera);
-            
-            // Raycast ke semua objek, tapi prioritaskan yang punya class 'hitbox'
-            const intersects = raycaster.intersectObjects(document.querySelector('a-scene').object3D.children, true);
-
-            for (let i = 0; i < intersects.length; i++) {
-                let obj = intersects[i].object;
-                let parent = obj.el;
-                
-                // Cari Zombie Parent
-                while (parent && !parent.classList.contains('zombie')) {
-                    parent = parent.parentNode;
-                }
-
-                if (parent && parent.dataset.dead !== "true") {
-                    killZombie(parent);
-                    break; 
-                }
-            }
-        }
-
-        function killZombie(el) {
-            el.dataset.dead = "true";
-            // Animasi Jatuh
-            el.setAttribute('animation', 'property: rotation; to: -90 0 0; dur: 1200; easing: easeOutBounce');
-            
-            gameState.score++;
-            updateHUD();
-            setTimeout(() => {
-                if (el.parentNode) el.parentNode.removeChild(el);
-                gameState.zombies = gameState.zombies.filter(z => z !== el);
-                if (gameState.zombies.length < 2) spawnTitan();
-            }, 1500);
-        }
-
-        function takeDamage(amt) {
-            gameState.hp -= amt;
-            updateHUD();
-            const flash = document.getElementById('damage-flash');
-            flash.style.opacity = 1; setTimeout(() => flash.style.opacity = 0, 200);
-            if (gameState.hp <= 0) {
-                gameState.running = false;
-                document.getElementById('game-over-screen').style.display = 'flex';
-            }
-        }
-
-        function updateHUD() {
-            document.getElementById('score').innerText = gameState.score;
-            document.getElementById('ammo').innerText = gameState.ammo;
-            document.getElementById('hp-bar').style.width = Math.max(0, gameState.hp) + '%';
-        }
-
-        function updateRadar() {
-            const radar = document.getElementById('radar');
-            radar.innerHTML = '<div class="radar-center"></div>';
-            const cam = document.querySelector('[gps-camera]').object3D;
-            const angle = cam.rotation.y;
-
-            gameState.zombies.forEach(z => {
-                if (z.dataset.dead === "true") return;
-                const zPos = z.object3D.position;
-                const dx = zPos.x - cam.position.x;
-                const dz = zPos.z - cam.position.z;
-                const rx = dx * Math.cos(angle) - dz * Math.sin(angle);
-                const rz = dx * Math.sin(angle) + dz * Math.cos(angle);
-                const px = 60 + (rx * CONFIG.radarScale);
-                const py = 60 + (rz * CONFIG.radarScale); 
-                if (Math.sqrt((px-60)**2 + (py-60)**2) < 60) {
-                    const blip = document.createElement('div');
-                    blip.className = 'radar-blip';
-                    blip.style.left = px + 'px'; blip.style.top = py + 'px';
-                    radar.appendChild(blip);
-                }
-            });
-        }
     </script>
 </body>
 </html>
