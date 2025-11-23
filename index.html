@@ -197,7 +197,7 @@
         AFRAME.registerComponent('zombie-ai', {
             init: function() {
                 // FIX: Menurunkan posisi Y ke -10 agar terlihat menapak di tanah (sangat jauh di bawah kamera)
-                this.el.object3D.position.y = -10; 
+                this.el.object3D.position.y = -20; 
             },
             tick: function() {
                 if (!gameState.running || this.el.dataset.dead === "true") return;
