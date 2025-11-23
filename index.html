@@ -148,7 +148,7 @@
         <h1 style="font-family:'Orbitron'; color:red; text-shadow:0 0 10px red;">ZOMBIE PROTOCOL</h1>
         <p style="color:#aaa; font-family:'Share Tech Mono'; font-size: 14px; line-height: 1.5;">
             MUSUH UKURAN RAKSASA TERDETEKSI.<br>
-            BERTAHAN HIDUP SEKUAT TENAGA.
+            JARAK JAUH (20M - 40M). WASPADA.
         </p>
         <button class="btn" onclick="startGame()">DEPLOY MISSION</button>
         <button class="btn" style="margin-top:10px; background:#222; border-color:#555; font-size:10px; padding:10px;" onclick="forceStart()">⚠️ INDOOR TEST MODE</button>
@@ -182,8 +182,9 @@
         const CONFIG = {
             speed: 0.05,        
             hitDistance: 3.5,   
-            spawnDistMin: 5,    
-            spawnDistMax: 10,    
+            // UPDATE: JARAK SPAWN JAUH
+            spawnDistMin: 20,    
+            spawnDistMax: 40,    
             maxHp: 100,
             damage: 10          
         };
@@ -196,8 +197,8 @@
         // ZOMBIE AI COMPONENT
         AFRAME.registerComponent('zombie-ai', {
             init: function() {
-                // FIX: Menurunkan posisi Y ke -10 agar terlihat menapak di tanah (sangat jauh di bawah kamera)
-                this.el.object3D.position.y = -20; 
+                // UPDATE: Y = -25 untuk mengakomodasi skala raksasa
+                this.el.object3D.position.y = -25; 
             },
             tick: function() {
                 if (!gameState.running || this.el.dataset.dead === "true") return;
@@ -206,12 +207,11 @@
                 const camera = document.querySelector('[gps-camera]').object3D;
                 const camPos = camera.position;
 
-                // Hitung jarak Horizontal
                 const dx = zombiePos.x - camPos.x;
                 const dz = zombiePos.z - camPos.z;
                 const distHorizontal = Math.sqrt(dx*dx + dz*dz);
 
-                // Logika Chase
+                // Chase Logic
                 if (distHorizontal > 1.5) { 
                     this.el.object3D.lookAt(camPos.x, zombiePos.y, camPos.z);
                     
@@ -227,7 +227,7 @@
                     this.el.object3D.position.addScaledVector(dir, CONFIG.speed);
                 }
 
-                // Logika Hit
+                // Hit Logic
                 if (distHorizontal <= CONFIG.hitDistance) {
                     if (!this.lastHit || Date.now() - this.lastHit > 1000) { 
                         takeDamage(CONFIG.damage);
@@ -280,19 +280,19 @@
             const x = Math.sin(angle) * dist;
             const z = Math.cos(angle) * dist;
 
-            // Posisi awal di Y=-10
-            zombie.setAttribute('position', `${x} -10 ${z}`);
+            // Spawn di posisi Y rendah
+            zombie.setAttribute('position', `${x} -25 ${z}`);
 
             const model = document.createElement('a-entity');
             model.setAttribute('gltf-model', '#zombie-model');
-            // SCALE DIPERBESAR JADI 8x
-            model.setAttribute('scale', '8 8 8');
+            // UPDATE: SCALE RAKSASA (15x)
+            model.setAttribute('scale', '15 15 15');
             model.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1');
             zombie.appendChild(model);
 
             const box = document.createElement('a-box');
             box.setAttribute('color', 'red');
-            box.setAttribute('width', '1'); box.setAttribute('height', '4'); box.setAttribute('depth', '1');
+            box.setAttribute('width', '2'); box.setAttribute('height', '8'); box.setAttribute('depth', '2');
             box.setAttribute('visible', 'false');
             zombie.appendChild(box);
 
@@ -403,7 +403,9 @@
                 const dz = zPos.z - camera.position.z;
                 const rX = dx * Math.cos(camAngle) - dz * Math.sin(camAngle);
                 const rZ = dx * Math.sin(camAngle) + dz * Math.cos(camAngle);
-                const scale = 3; 
+                
+                // UPDATE: Scale radar diperkecil (1) agar jangkauan radar lebih jauh (45m)
+                const scale = 1; 
                 const uiX = 45 + (rX * scale);
                 const uiY = 45 + (rZ * scale); 
                 if (Math.sqrt((uiX-45)**2 + (uiY-45)**2) < 45) {
