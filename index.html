@@ -228,11 +228,11 @@
         // --- CONFIGURATION ---
         const CONFIG = {
             speed: 0.05,        // Kecepatan jalan zombie
-            hitDistance: 2.0,   // Jarak hit (meter)
-            spawnDistMin: 4,    // Spawn jarak minimal
-            spawnDistMax: 8,    // Spawn jarak maksimal
+            hitDistance: 2.5,   // PERBAIKAN: Jarak hit horizontal (lebih besar)
+            spawnDistMin: 4,    
+            spawnDistMax: 8,    
             maxHp: 100,
-            damage: 5           // Damage per hit (lebih sakit biar kerasa)
+            damage: 5           
         };
 
         // --- STATE ---
@@ -248,7 +248,7 @@
         // --- ZOMBIE BEHAVIOR COMPONENT ---
         AFRAME.registerComponent('zombie-ai', {
             init: function() {
-                // Posisi Y -1.5 agar kaki robot menapak di "tanah" (asumsi kamera di 1.6m)
+                // Posisi Y -1.5 agar kaki robot menapak di "tanah"
                 this.el.object3D.position.y = -1.5; 
             },
             tick: function() {
@@ -258,29 +258,37 @@
                 const camera = document.querySelector('[gps-camera]').object3D;
                 const camPos = camera.position;
 
-                // 1. HITUNG JARAK
-                const dist = zombiePos.distanceTo(camPos);
+                // 1. HITUNG JARAK HORIZONTAL (IGNORE Y)
+                // Ini penting: kita abaikan tinggi badan player vs zombie
+                const dx = zombiePos.x - camPos.x;
+                const dz = zombiePos.z - camPos.z;
+                const distHorizontal = Math.sqrt(dx*dx + dz*dz);
 
                 // 2. LOGIKA MOVEMENT (CHASE)
-                // Jika zombie > 1 meter, dia mengejar
-                if (dist > 1.2) { 
+                // Jika zombie > 1 meter (horizontal), dia mengejar
+                if (distHorizontal > 1.0) { 
                     this.el.object3D.lookAt(camPos.x, zombiePos.y, camPos.z);
                     
                     const dir = new THREE.Vector3();
-                    dir.subVectors(camPos, zombiePos).normalize();
+                    // Kita pakai world position untuk arah yang lebih akurat
+                    const zWorld = new THREE.Vector3();
+                    const cWorld = new THREE.Vector3();
+                    this.el.object3D.getWorldPosition(zWorld);
+                    camera.getWorldPosition(cWorld);
+
+                    dir.subVectors(cWorld, zWorld).normalize();
                     dir.y = 0; // Kunci sumbu Y agar tidak terbang
                     
                     this.el.object3D.position.addScaledVector(dir, CONFIG.speed);
                 }
 
                 // 3. LOGIKA HIT (DAMAGE)
-                // Hanya hit jika cooldown damage selesai (biar ga langsung mati instan)
-                if (dist <= CONFIG.hitDistance) {
+                // PERBAIKAN: Gunakan distHorizontal agar tinggi tidak pengaruh
+                if (distHorizontal <= CONFIG.hitDistance) {
                     if (!this.lastHit || Date.now() - this.lastHit > 1000) { // Hit setiap 1 detik
+                        console.log("HIT PLAYER!"); // Debug log
                         takeDamage(CONFIG.damage);
                         this.lastHit = Date.now();
-                        // Efek mundur sedikit saat nyerang biar realistis
-                        // this.el.object3D.translateZ(-0.5); 
                     }
                 }
             }
