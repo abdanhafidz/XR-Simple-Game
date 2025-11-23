@@ -165,17 +165,17 @@
     <script>
         // --- CONFIG ---
         const CONFIG = {
-            spawnDistMin: 20,    
-            spawnDistMax: 40,    
-            modelScale: 15, // Titan Scale
-            yOffset: -20
+            spawnDistMin: 30,    // JARAK MINIMAL 30 METER
+            spawnDistMax: 60,    // JARAK MAKSIMAL 60 METER
+            modelScale: 15,      // Titan Scale
+            yOffset: -20         // Di bawah tanah
         };
 
         let gameState = { running: false, score: 0, wave: 1, zombies: [] };
-        let handState = { detected: false, x: 0.5, y: 0.5 }; // Normalisasi 0-1
+        let handState = { detected: false, x: 0.5, y: 0.5 }; 
 
         // --- MEDIAPIPE HANDS SETUP ---
-        const videoElement = document.createElement('video'); // Hidden video element for MediaPipe if needed
+        const videoElement = document.createElement('video'); 
         let hands;
         let cameraPipe;
 
@@ -186,7 +186,7 @@
 
             hands.setOptions({
                 maxNumHands: 1,
-                modelComplexity: 0, // 0 = Lite (Paling Cepat untuk HP), 1 = Full
+                modelComplexity: 0, 
                 minDetectionConfidence: 0.5,
                 minTrackingConfidence: 0.5
             });
@@ -203,20 +203,11 @@
                 status.style.display = 'none';
                 cursor.classList.add('active');
 
-                // Ambil landmark jari telunjuk (Index 8)
                 const indexTip = results.multiHandLandmarks[0][8];
                 
-                // MediaPipe koordinat X terbalik (mirror), kita perlu flip
-                // Tapi karena ini kamera belakang (world facing), biasanya tidak dimirror oleh AR.js
-                // Kita coba raw dulu.
-                
-                // Mapping ke layar
-                // Note: Tergantung orientasi HP, kadang X dan Y tertukar di MediaPipe
-                // Asumsi Potrait Mode standard
                 handState.x = indexTip.x;
                 handState.y = indexTip.y;
 
-                // Update posisi Crosshair
                 cursor.style.left = `${handState.x * 100}%`;
                 cursor.style.top = `${handState.y * 100}%`;
 
@@ -241,7 +232,7 @@
                 const dir = new THREE.Vector3();
                 dir.subVectors(camPos, zPos).normalize();
                 dir.y = 0;
-                this.el.object3D.position.addScaledVector(dir, 0.08); // Speed
+                this.el.object3D.position.addScaledVector(dir, 0.08); 
             }
         });
 
@@ -250,24 +241,19 @@
             document.getElementById('start-screen').style.display = 'none';
             gameState.running = true;
             
-            // Start MediaPipe Process
             setupMediaPipe();
             startCameraPipe();
 
             spawnWave();
             
-            // Event Listener Tembak
             window.addEventListener('click', shoot);
             window.addEventListener('touchstart', (e) => {
-                // Prevent zoom
                 if(e.cancelable) e.preventDefault(); 
                 shoot(); 
             }, {passive: false});
         }
 
         function startCameraPipe() {
-            // Kita perlu hook ke video yang dibuat AR.js
-            // AR.js membuat elemen <video> di dalam body
             const arVideo = document.querySelector('video');
             
             if (arVideo) {
@@ -279,7 +265,6 @@
                 }
                 processFrame();
             } else {
-                // Retry jika video belum ready
                 setTimeout(startCameraPipe, 500);
             }
         }
@@ -294,9 +279,19 @@
             zombie.setAttribute('zombie-ai', '');
             zombie.classList.add('zombie');
 
+            // LOGIKA SPAWN BARU: RELATIF TERHADAP POSISI PLAYER SAAT INI
+            const cameraEl = document.querySelector('[gps-camera]');
+            const camPos = cameraEl.object3D.position; // Posisi user saat ini
+
             const angle = Math.random() * Math.PI * 2;
-            const dist = 20 + Math.random() * 20;
-            zombie.setAttribute('position', `${Math.sin(angle)*dist} ${CONFIG.yOffset} ${Math.cos(angle)*dist}`);
+            // Menggunakan CONFIG untuk jarak jauh (30-60 meter)
+            const dist = CONFIG.spawnDistMin + Math.random() * (CONFIG.spawnDistMax - CONFIG.spawnDistMin);
+            
+            // Koordinat spawn = Posisi Player + Offset Random
+            const spawnX = camPos.x + Math.sin(angle) * dist;
+            const spawnZ = camPos.z + Math.cos(angle) * dist;
+
+            zombie.setAttribute('position', `${spawnX} ${CONFIG.yOffset} ${spawnZ}`);
 
             const model = document.createElement('a-entity');
             model.setAttribute('gltf-model', '#zombie-model');
@@ -304,9 +299,8 @@
             model.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1');
             zombie.appendChild(model);
 
-            // Hitbox Box
             const box = document.createElement('a-box');
-            box.setAttribute('visible', 'false'); // Invisible hitbox
+            box.setAttribute('visible', 'false'); 
             box.setAttribute('scale', '1 3 1');
             zombie.appendChild(box);
 
@@ -314,22 +308,16 @@
             gameState.zombies.push(zombie);
         }
 
-        // --- SHOOTING LOGIC DENGAN HAND TRACKING ---
+        // --- SHOOTING LOGIC ---
         function shoot() {
             if (!gameState.running) return;
 
-            // Visual Feedback
             const cursor = document.getElementById('finger-cursor');
             cursor.classList.add('locked');
             setTimeout(() => cursor.classList.remove('locked'), 100);
 
             const raycaster = new THREE.Raycaster();
             const camera = document.querySelector('[gps-camera]').object3D.children[0];
-            
-            // LOGIKA UTAMA: Menggunakan posisi jari (handState) bukan tengah layar (0,0)
-            // Konversi dari 0..1 ke -1..1 (Normalized Device Coordinates)
-            // x: 0 (kiri) -> -1, 1 (kanan) -> 1
-            // y: 0 (atas) -> 1, 1 (bawah) -> -1
             
             let aimX = 0; 
             let aimY = 0;
@@ -338,7 +326,6 @@
                 aimX = (handState.x * 2) - 1;
                 aimY = -(handState.y * 2) + 1;
             } else {
-                // Fallback ke tengah layar jika tangan tidak terdeteksi
                 console.log("Hand not found, shooting center");
             }
 
@@ -365,14 +352,13 @@
             el.dataset.dead = "true";
             el.setAttribute('animation', 'property: scale; to: 0 0 0; dur: 500; easing: easeInBack');
             
-            // Update Score UI
             gameState.score++;
             document.getElementById('score').innerText = gameState.score;
 
             setTimeout(() => {
                 if (el.parentNode) el.parentNode.removeChild(el);
                 gameState.zombies = gameState.zombies.filter(z => z !== el);
-                if(gameState.zombies.length < 3) spawnZombie(); // Respawn
+                if(gameState.zombies.length < 3) spawnZombie(); 
             }, 500);
         }
     </script>
