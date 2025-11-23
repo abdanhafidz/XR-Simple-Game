@@ -10,7 +10,7 @@
     <script src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js'></script>
     <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
     
-    <!-- MediaPipe Hands (Versi CDN Stabil) -->
+    <!-- MediaPipe Hands -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
@@ -22,7 +22,7 @@
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Orbitron', sans-serif; }
         
-        /* Video Fullscreen Fix */
+        /* VIDEO FULLSCREEN FIX */
         #arjs-video, video {
             width: 100% !important; height: 100% !important;
             position: absolute !important; top: 0; left: 0;
@@ -35,7 +35,7 @@
             display: flex; flex-direction: column; justify-content: space-between;
         }
 
-        /* DEBUG CANVAS (Untuk Cek Hand Tracking) */
+        /* DEBUG CANVAS (PENTING: Cek apakah garis tangan muncul disini) */
         #debug-canvas {
             position: absolute; top: 10px; left: 10px;
             width: 120px; height: 90px;
@@ -44,36 +44,56 @@
             display: block; /* Tampilkan agar user tau AI jalan */
         }
 
-        /* UI ELEMENTS */
+        /* HUD STYLES (CYBERPUNK RESTORED) */
         .hud-panel {
-            background: rgba(0, 20, 40, 0.8); border: 2px solid #00ffff;
-            padding: 10px 20px; transform: skewX(-15deg);
-            box-shadow: 0 0 15px #00ffff; margin: 10px;
+            background: rgba(0, 20, 40, 0.8); 
+            border: 2px solid #00ffff;
+            padding: 10px 20px; 
+            transform: skewX(-15deg);
+            box-shadow: 0 0 15px #00ffff; 
+            margin: 10px;
             backdrop-filter: blur(4px);
+            min-width: 100px;
+            text-align: center;
         }
-        .hud-text { color: #fff; font-size: 24px; transform: skewX(15deg); text-shadow: 0 0 5px #00ffff; }
-        .hud-label { font-family: 'Share Tech Mono'; font-size: 10px; color: #00ffff; display: block; margin-bottom: 2px; transform: skewX(15deg); }
+        
+        .hud-text { 
+            color: #fff; 
+            font-size: 24px; 
+            transform: skewX(15deg); 
+            text-shadow: 0 0 5px #00ffff;
+            font-weight: bold;
+        }
+        
+        .hud-label { 
+            font-family: 'Share Tech Mono'; 
+            font-size: 10px; 
+            color: #00ffff; 
+            display: block; 
+            margin-bottom: 2px; 
+            transform: skewX(15deg); 
+        }
 
         .top-row { display: flex; justify-content: space-between; padding-top: 20px; }
         .bottom-row { display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 20px; }
 
-        /* CURSOR HIJAU */
+        /* CURSOR (TARGET HIJAU) */
         #aim-cursor {
             position: absolute; width: 60px; height: 60px;
             border: 3px solid #0f0; border-radius: 50%;
             transform: translate(-50%, -50%);
-            top: 50%; left: 50%; opacity: 0;
+            top: 50%; left: 50%; opacity: 0.5; /* Selalu terlihat sedikit */
             box-shadow: 0 0 20px #0f0; transition: opacity 0.2s;
             display: flex; align-items: center; justify-content: center;
         }
-        #aim-cursor::after { content: ''; width: 8px; height: 8px; background: #0f0; }
+        #aim-cursor::after { content: ''; width: 8px; height: 8px; background: #0f0; border-radius: 50%; }
 
-        /* BUTTONS & STATUS */
-        #status-msg {
+        /* STATUS & BUTTONS */
+        #hand-status {
             position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%);
             color: #0ff; font-family: 'Share Tech Mono'; font-size: 14px;
             text-shadow: 0 0 5px #000; background: rgba(0,0,0,0.6); padding: 10px;
-            border: 1px solid #0ff; text-align: center;
+            border: 1px solid #0ff; text-align: center; pointer-events: none;
         }
 
         #fire-btn {
@@ -83,6 +103,7 @@
             display: flex; align-items: center; justify-content: center;
             color: white; font-size: 18px; pointer-events: auto;
             box-shadow: 0 0 25px #ff0000; cursor: pointer;
+            font-family: 'Orbitron';
         }
         #fire-btn:active { background: #f00; transform: scale(0.95); }
 
@@ -90,6 +111,7 @@
         .hp-container { width: 200px; margin-left: 20px; transform: skewX(-15deg); }
         .hp-bar-bg { width: 100%; height: 20px; background: #300; border: 2px solid #ff0000; }
         .hp-bar-fill { width: 100%; height: 100%; background: #ff0000; transition: width 0.2s; box-shadow: 0 0 10px #f00; }
+        .hp-label { color: #fff; font-size: 12px; margin-bottom: 5px; font-family: 'Orbitron'; }
 
         /* Radar */
         .radar {
@@ -111,7 +133,8 @@
     <div id="damage-flash"></div>
 
     <div id="ui-layer">
-        <canvas id="debug-canvas"></canvas> <!-- PENTING: Cek AI disini -->
+        <!-- Debug Canvas: Lihat disini untuk memastikan AI bekerja -->
+        <canvas id="debug-canvas"></canvas> 
         
         <div class="top-row">
             <div class="hud-panel" style="border-color: #0ff;">
@@ -124,16 +147,16 @@
             </div>
         </div>
 
-        <!-- AIMING -->
+        <!-- AIMING & STATUS -->
         <div id="aim-cursor"></div>
-        <div id="status-msg">LOADING AI...<br>Tunggu Kamera Ready</div>
+        <div id="hand-status">MENYIAPKAN AI...<br>Cek Kotak Merah Kiri Atas</div>
 
         <div class="radar" id="radar"></div>
         <div id="fire-btn">SHOOT</div>
 
         <div class="bottom-row">
             <div class="hp-container">
-                <span class="hud-label" style="color:#fff; margin-left: 10px;">HP INTEGRITY</span>
+                <div class="hp-label">HP INTEGRITY</div>
                 <div class="hp-bar-bg"><div class="hp-bar-fill" id="hp-bar"></div></div>
             </div>
             <div class="hud-panel" style="border-color: #f00;">
@@ -146,11 +169,11 @@
     <!-- START SCREEN -->
     <div id="start-screen" class="screen">
         <h1 style="color:red; font-size:40px; text-shadow:0 0 20px red; margin-bottom:10px;">ZOMBIE PROTOCOL</h1>
-        <p style="color:#aaa; font-family:'Share Tech Mono';">
-            HAND TRACKING MODE<br>
-            1. Gunakan Tangan Kanan di DEPAN Kamera<br>
-            2. Jika muncul garis merah di pojok kiri atas,<br>berarti tangan terdeteksi.<br>
-            3. Arahkan Pistol ke Zombie & Tembak.
+        <p style="color:#aaa; font-family:'Share Tech Mono'; max-width: 80%;">
+            HAND TRACKING 1:1 ENABLED<br><br>
+            1. Pistol menempel di tangan kanan<br>
+            2. Kursor Hijau mengikuti ujung jari<br>
+            3. Pastikan cahaya ruangan terang!
         </p>
         <button class="btn-main" onclick="game.start()">DEPLOY</button>
     </div>
@@ -169,6 +192,7 @@
         loading-screen="enabled: false">
 
         <a-assets>
+            <!-- Model Titan -->
             <a-asset-item id="titan-model" src="https://raw.githack.com/KhronosGroup/glTF-Sample-Models/master/2.0/CesiumMan/glTF-Binary/CesiumMan.glb"></a-asset-item>
         </a-assets>
 
@@ -176,7 +200,7 @@
         <a-light type="directional" color="#fff" intensity="2" position="1 1 0"></a-light>
 
         <a-camera gps-camera rotation-reader far="5000">
-            <!-- PISTOL 3D (Menempel di kamera dulu, nanti diupdate script) -->
+            <!-- PISTOL 3D (Diupdate oleh Script) -->
             <a-entity id="gun-rig" position="0.5 -0.5 -1" rotation="0 0 0" visible="false">
                 <a-entity scale="3 3 3" rotation="0 180 0">
                     <a-box color="#111" width="0.1" height="0.15" depth="0.4"></a-box>
@@ -200,7 +224,7 @@
             start: function() {
                 document.getElementById('start-screen').style.display = 'none';
                 this.running = true;
-                ai.init();
+                ai.init(); // Mulai AI
                 this.spawnWave();
                 this.loop();
                 
@@ -233,18 +257,17 @@
 
                 el.setAttribute('position', `${x} -35 ${z}`);
 
-                // Model
                 const model = document.createElement('a-entity');
                 model.setAttribute('gltf-model', '#titan-model');
                 model.setAttribute('scale', '30 30 30');
                 model.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1.5');
                 el.appendChild(model);
 
-                // HITBOX RAKSASA (Kunci agar gampang ditembak)
+                // HITBOX BESAR (Kunci agar gampang ditembak)
                 const hitbox = document.createElement('a-box');
                 hitbox.setAttribute('material', 'visible: false');
                 hitbox.classList.add('hitbox'); 
-                hitbox.setAttribute('scale', '15 60 15'); // Sangat Besar
+                hitbox.setAttribute('scale', '15 60 15'); 
                 hitbox.setAttribute('position', '0 30 0');
                 el.appendChild(hitbox);
 
@@ -266,7 +289,7 @@
                         const dir = new THREE.Vector3(dx, 0, dz).normalize().negate();
                         z.object3D.position.addScaledVector(dir, 0.2);
                     }
-                    if(dist < 15) this.takeDamage(0.5); // Damage per frame kecil
+                    if(dist < 15) this.takeDamage(0.5);
                 });
             },
 
@@ -275,7 +298,7 @@
                 this.ammo--; 
                 document.getElementById('ammo').innerText = this.ammo;
 
-                // Recoil Visual
+                // Recoil
                 const gun = document.getElementById('gun-rig');
                 const muzzle = document.getElementById('muzzle');
                 if(gun) {
@@ -287,25 +310,23 @@
                     }, 50);
                 }
 
-                // --- RAYCASTER DARI KURSOR ---
+                // SHOOT LOGIC: Raycast dari KURSOR
                 const raycaster = new THREE.Raycaster();
                 const camObj = document.querySelector('[gps-camera]').object3D.children[0];
                 
                 let ndcX = 0, ndcY = 0;
-                
                 if(ai.detected) {
-                    // Gunakan posisi AI (0..1) convert ke NDC (-1..1)
                     ndcX = (ai.x * 2) - 1;
                     ndcY = -(ai.y * 2) + 1;
                 }
 
                 raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camObj);
                 
+                // Intersect semua objek, cari hitbox
                 const intersects = raycaster.intersectObjects(document.querySelector('a-scene').object3D.children, true);
                 
                 for(let hit of intersects) {
                     let el = hit.object.el;
-                    // Cari parent zombie
                     while(el && !el.classList.contains('zombie')) {
                         el = el.parentNode;
                     }
@@ -342,37 +363,10 @@
                     document.getElementById('game-over').style.display = 'flex';
                     document.getElementById('final-score').innerText = this.score;
                 }
-            },
-
-            updateRadar: function() {
-                const radar = document.getElementById('radar');
-                // Bersihkan blip
-                Array.from(radar.children).forEach(c => { if(c.className === 'radar-blip') c.remove(); });
-                
-                const cam = document.querySelector('[gps-camera]').object3D;
-                const angle = cam.rotation.y;
-
-                this.zombies.forEach(z => {
-                    if(z.dataset.dead === 'true') return;
-                    const pos = z.object3D.position;
-                    const dx = pos.x - cam.position.x;
-                    const dz = pos.z - cam.position.z;
-                    const rx = dx * Math.cos(angle) - dz * Math.sin(angle);
-                    const rz = dx * Math.sin(angle) + dz * Math.cos(angle);
-                    const px = 50 + (rx * 0.3);
-                    const py = 50 + (rz * 0.3);
-                    
-                    if((px-50)**2 + (py-50)**2 < 50**2) {
-                        const b = document.createElement('div');
-                        b.className = 'radar-blip';
-                        b.style.left = px + 'px'; b.style.top = py + 'px';
-                        radar.appendChild(b);
-                    }
-                });
             }
         };
 
-        // --- AI HAND TRACKING (ROBUST VERSION) ---
+        // --- ROBUST AI HAND TRACKING ---
         const ai = {
             hands: null,
             video: null,
@@ -381,14 +375,14 @@
             ctx: null, canvas: null,
 
             init: function() {
-                // Setup Debug Canvas
+                // Setup Debug Canvas (Kiri Atas)
                 this.canvas = document.getElementById('debug-canvas');
                 this.ctx = this.canvas.getContext('2d');
 
                 this.hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
                 this.hands.setOptions({
                     maxNumHands: 1,
-                    modelComplexity: 0, // Lite
+                    modelComplexity: 0, // 0 = Tercepat untuk HP
                     minDetectionConfidence: 0.5,
                     minTrackingConfidence: 0.5
                 });
@@ -398,21 +392,25 @@
             },
 
             findVideoLoop: function() {
-                // Cari video AR.js secara agresif
+                // Cari video AR.js dengan paksa
                 const v = document.querySelector('video');
                 if(v && v.readyState >= 2 && v.videoWidth > 0) {
                     this.video = v;
+                    // Set ukuran canvas sama dengan video agar akurat
+                    this.canvas.width = v.videoWidth;
+                    this.canvas.height = v.videoHeight;
                     console.log("Video Found!", v);
-                    document.getElementById('status-msg').innerText = "AI CONNECTED. SHOW HAND.";
+                    document.getElementById('status-msg').innerText = "SYSTEM READY. SHOW HAND.";
                     this.processLoop();
                 } else {
+                    // Coba lagi setiap 500ms
                     setTimeout(() => this.findVideoLoop(), 500);
                 }
             },
 
             processLoop: function() {
                 if(!game.running) return;
-                // Kirim frame ke MediaPipe
+                // Kirim frame ke AI
                 this.hands.send({image: this.video}).then(() => {
                     requestAnimationFrame(() => this.processLoop());
                 });
@@ -420,45 +418,49 @@
 
             onResults: function(res) {
                 const cursor = document.getElementById('aim-cursor');
-                const status = document.getElementById('status-msg');
+                const status = document.getElementById('hand-status'); // Update msg utama
                 const gun = document.getElementById('gun-rig');
 
-                // Debug Draw
+                // Bersihkan canvas debug
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
                 if(res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
+                    // GAMBAR SKELETON TANGAN DI CANVAS DEBUG (MERAH)
                     drawConnectors(this.ctx, res.multiHandLandmarks[0], HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
                     drawLandmarks(this.ctx, res.multiHandLandmarks[0], {color: '#FF0000', lineWidth: 1});
                     
                     this.detected = true;
-                    status.style.display = 'none';
+                    status.style.display = 'none'; // Sembunyikan teks warning
                     cursor.style.opacity = 1;
                     if(gun) gun.setAttribute('visible', 'true');
 
                     const lm = res.multiHandLandmarks[0];
-                    const index = lm[8]; // Telunjuk
-                    const wrist = lm[0];
+                    const index = lm[8]; // Ujung Telunjuk
+                    const wrist = lm[0]; // Pergelangan
 
                     this.x = index.x;
                     this.y = index.y;
 
-                    // Update UI Cursor
+                    // 1. Update Kursor Hijau
                     cursor.style.left = (this.x * 100) + '%';
                     cursor.style.top = (this.y * 100) + '%';
 
-                    // Update Gun 3D Position
+                    // 2. Update Posisi Pistol 3D
                     if(gun) {
-                        // Mapping: (0..1) -> (-X..+X)
+                        // Mapping 1:1 (Layar 0..1 ke Lokal -X..+X)
+                        // Scale faktor disesuaikan agar jangkauan tangan pas
                         const gunX = (wrist.x - 0.5) * 3.0;
                         const gunY = -(wrist.y - 0.5) * 2.0 - 0.3;
                         gun.object3D.position.x = gunX;
                         gun.object3D.position.y = gunY;
 
-                        // Rotasi mengikuti jari
+                        // Rotasi mengikuti arah jari telunjuk
                         const dx = index.x - wrist.x;
                         const dy = index.y - wrist.y;
                         const rotZ = Math.atan2(dy, dx) * (180/Math.PI) + 90;
                         
                         gun.object3D.rotation.z = THREE.Math.degToRad(rotZ);
+                        // Nengok ke kursor
                         gun.object3D.rotation.y = (index.x - 0.5) * -1.0;
                         gun.object3D.rotation.x = (index.y - 0.5) * 0.5;
                     }
@@ -466,8 +468,8 @@
                 } else {
                     this.detected = false;
                     status.style.display = 'block';
-                    status.innerText = "TANGAN HILANG!";
-                    cursor.style.opacity = 0.2;
+                    status.innerText = "TANGAN TIDAK TERDETEKSI";
+                    cursor.style.opacity = 0.3;
                 }
             }
         };
