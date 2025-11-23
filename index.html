@@ -3,717 +3,554 @@
 <head>
     <meta charset='utf-8'>
     <meta http-equiv='X-UA-Compatible' content='IE=edge'>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Zombie Shooter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AR Zombie Shooter: Apocalypse</title>
     
-    <script src='https://aframe.io/releases/0.9.2/aframe.min.js'></script>
-    <script src="https://raw.githack.com/jeromeetienne/AR.js/master/aframe/build/aframe-ar.min.js"></script>
+    <!-- A-Frame & AR.js Libraries -->
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <script src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js'></script>
     <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
-    <script>
-        THREEx.ArToolkitContext.baseURL = 'https://raw.githack.com/jeromeetienne/ar.js/master/three.js/'
-    </script>
+    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     
     <style>
         body {
             margin: 0;
             overflow: hidden;
+            font-family: 'Orbitron', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
         }
-        
-        .centered {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 1000;
-        }
-        
-        #ui-overlay {
+
+        /* UI Layer */
+        #ui-layer {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             pointer-events: none;
-            z-index: 100;
+            z-index: 10;
         }
-        
-        #crosshair {
+
+        /* Blood Vignette Effect */
+        #damage-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            box-shadow: inset 0 0 100px rgba(255, 0, 0, 0);
+            pointer-events: none;
+            transition: box-shadow 0.2s;
+            z-index: 5;
+        }
+
+        /* Crosshair */
+        .crosshair-container {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 50px;
-            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        
+
+        .crosshair {
+            width: 40px;
+            height: 40px;
+            border: 2px solid rgba(0, 255, 255, 0.8);
+            border-radius: 50%;
+            position: relative;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 4px;
+            background: #ff0000;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+        }
+
         .crosshair-line {
             position: absolute;
-            background: rgba(255, 0, 0, 0.9);
-            box-shadow: 0 0 5px rgba(255, 0, 0, 0.8);
+            background: rgba(0, 255, 255, 0.6);
         }
-        
-        .crosshair-h {
-            width: 50px;
-            height: 3px;
-            top: 50%;
-            left: 0;
-            transform: translateY(-50%);
-        }
-        
-        .crosshair-v {
-            width: 3px;
-            height: 50px;
-            left: 50%;
-            top: 0;
-            transform: translateX(-50%);
-        }
-        
-        .crosshair-circle {
+
+        .h-line { width: 60px; height: 1px; top: 50%; left: -10px; }
+        .v-line { width: 1px; height: 60px; left: 50%; top: -10px; }
+
+        /* Stats Panels */
+        .hud-panel {
             position: absolute;
-            width: 35px;
-            height: 35px;
-            border: 3px solid rgba(255, 0, 0, 0.8);
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 0 10px rgba(255, 0, 0, 0.6);
-        }
-        
-        #score-panel {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.85);
+            padding: 15px;
+            background: rgba(10, 20, 30, 0.85);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-left: 5px solid #00ffff;
             color: #fff;
-            padding: 20px 30px;
-            border-radius: 12px;
-            font-size: 20px;
-            border: 3px solid #ff0000;
-            font-weight: bold;
-            font-family: Arial, sans-serif;
-            box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            transform: skewX(-10deg);
         }
-        
-        #ammo-panel {
-            position: absolute;
+
+        .hud-value {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 24px;
+            color: #00ffff;
+            text-shadow: 0 0 5px rgba(0, 255, 255, 0.8);
+        }
+
+        .hud-label {
+            font-size: 10px;
+            color: #aaa;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        #score-panel { top: 20px; left: 20px; }
+        #wave-panel { top: 20px; right: 20px; text-align: right; border-left: none; border-right: 5px solid #ffaa00; }
+        #wave-panel .hud-value { color: #ffaa00; text-shadow: 0 0 5px rgba(255, 170, 0, 0.8); }
+
+        #ammo-panel { 
+            bottom: 30px; 
+            right: 20px; 
+            border-left: none; 
+            border-right: 5px solid #ff0000;
+            text-align: right;
+        }
+        #ammo-panel .hud-value { color: #ff0000; font-size: 32px; }
+
+        /* Radar / GPS Debug */
+        #radar-panel {
             bottom: 30px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.85);
-            color: #fff;
-            padding: 20px 30px;
-            border-radius: 12px;
-            font-size: 20px;
-            border: 3px solid #ff6600;
-            font-weight: bold;
-            font-family: Arial, sans-serif;
-            box-shadow: 0 0 20px rgba(255, 102, 0, 0.5);
+            left: 20px;
+            width: 150px;
+            font-size: 10px;
+            color: #0f0;
+            font-family: 'Share Tech Mono', monospace;
+            opacity: 0.7;
         }
-        
-        #game-over {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.95);
-            color: #fff;
-            padding: 50px;
-            border-radius: 20px;
-            text-align: center;
-            display: none;
-            border: 4px solid #ff0000;
-            z-index: 200;
-            font-family: Arial, sans-serif;
-            box-shadow: 0 0 40px rgba(255, 0, 0, 0.8);
-        }
-        
-        #game-over h1 {
-            margin: 0 0 20px 0;
-            font-size: 52px;
-            color: #ff0000;
-            text-shadow: 3px 3px 6px rgba(0,0,0,0.8);
-        }
-        
-        #restart-btn, #start-btn {
-            margin-top: 20px;
-            padding: 18px 45px;
-            font-size: 22px;
-            background: #ff0000;
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
+
+        /* Screens (Start, Game Over) */
+        .fullscreen-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
             pointer-events: auto;
-            transition: all 0.3s;
-            font-weight: bold;
-            box-shadow: 0 4px 15px rgba(255, 0, 0, 0.4);
-        }
-
-        #start-btn {
-            background: #00ff00;
-            color: #000;
-            box-shadow: 0 4px 15px rgba(0, 255, 0, 0.4);
-        }
-        
-        #restart-btn:hover {
-            background: #cc0000;
-            transform: scale(1.05);
-        }
-
-        #start-btn:hover {
-            background: #00cc00;
-            transform: scale(1.05);
-        }
-        
-        #instructions {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.95);
-            color: #fff;
-            padding: 40px;
-            border-radius: 20px;
             text-align: center;
-            max-width: 450px;
-            border: 4px solid #00ff00;
-            z-index: 300;
-            font-family: Arial, sans-serif;
-            box-shadow: 0 0 40px rgba(0, 255, 0, 0.6);
-        }
-        
-        #loading {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.95);
-            color: #fff;
-            padding: 40px;
-            border-radius: 20px;
-            text-align: center;
-            display: none;
-            z-index: 400;
-            font-family: Arial, sans-serif;
         }
 
-        .loading-spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top: 4px solid #00ff00;
-            border-radius: 50%;
+        h1 {
+            font-size: 40px;
+            color: #ff0000;
+            text-shadow: 0 0 20px rgba(255, 0, 0, 0.8);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        p { color: #ccc; margin-bottom: 30px; max-width: 80%; line-height: 1.6; }
+
+        .btn {
+            background: linear-gradient(45deg, #cc0000, #990000);
+            color: white;
+            padding: 15px 40px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 20px;
+            border: none;
+            clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+            cursor: pointer;
+            transition: transform 0.2s, filter 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .btn:active { transform: scale(0.95); }
+        .btn:hover { filter: brightness(1.2); }
+
+        /* Loading */
+        #loading-screen { z-index: 90; display: none; }
+        .loader {
             width: 50px;
             height: 50px;
+            border: 5px solid #333;
+            border-top: 5px solid #00ffff;
+            border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin: 20px auto;
         }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .hit-marker {
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Effects */
+        .hit-indicator {
             position: absolute;
             color: #ff0000;
-            font-size: 56px;
-            font-weight: bold;
+            font-weight: 900;
+            font-size: 24px;
+            animation: floatUp 0.8s ease-out forwards;
             pointer-events: none;
-            animation: hitMarkerAnim 0.6s ease-out;
-            text-shadow: 3px 3px 6px rgba(0,0,0,0.9);
-            z-index: 150;
-        }
-        
-        @keyframes hitMarkerAnim {
-            0% {
-                opacity: 1;
-                transform: scale(1);
-            }
-            100% {
-                opacity: 0;
-                transform: scale(2.5) translateY(-60px);
-            }
-        }
-        
-        .muzzle-flash {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 200px;
-            height: 200px;
-            background: radial-gradient(circle, rgba(255,255,150,1) 0%, rgba(255,180,0,0.8) 30%, transparent 70%);
-            border-radius: 50%;
-            pointer-events: none;
-            animation: muzzleFlashAnim 0.2s ease-out;
-            z-index: 150;
-        }
-        
-        @keyframes muzzleFlashAnim {
-            0% {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(0.3);
-            }
-            100% {
-                opacity: 0;
-                transform: translate(-50%, -50%) scale(2.5);
-            }
+            text-shadow: 0 0 5px black;
         }
 
-        #debug-panel {
-            position: absolute;
-            top: 170px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.85);
-            color: #0f0;
-            padding: 12px;
-            font-size: 12px;
-            font-family: 'Courier New', monospace;
-            border-radius: 8px;
-            border: 2px solid #0f0;
-            max-width: 280px;
-            line-height: 1.5;
+        @keyframes floatUp {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -150%) scale(1.5); opacity: 0; }
         }
     </style>
 </head>
 
-<body style='margin: 0; overflow: hidden;'>
-    <div id="instructions">
-        <h2>🧟 AR ZOMBIE SHOOTER 🎯</h2>
-        <p><strong>Cara Bermain:</strong></p>
-        <p>• Izinkan akses <strong>Kamera & Lokasi GPS</strong><br>
-        • Zombie akan muncul di sekitar Anda<br>
-        • <strong>Tap layar</strong> untuk menembak!<br>
-        • Habisi zombie sebelum ammo habis!</p>
-        <p style="font-size: 14px; color: #aaa; margin-top: 20px;">
-            ⚠️ Gunakan di luar ruangan untuk GPS akurat<br>
-            📍 Zombie spawn radius 5-15 meter
-        </p>
-        <button id="start-btn">🎮 MULAI GAME</button>
-    </div>
+<body>
+    <!-- Damage Vignette -->
+    <div id="damage-overlay"></div>
 
-    <div id="loading">
-        <h3>📍 Mendapatkan Lokasi GPS...</h3>
-        <div class="loading-spinner"></div>
-        <p>Mohon izinkan akses lokasi</p>
-    </div>
-
-    <div id="ui-overlay" style="display: none;">
-        <div id="crosshair">
-            <div class="crosshair-line crosshair-h"></div>
-            <div class="crosshair-line crosshair-v"></div>
-            <div class="crosshair-circle"></div>
-        </div>
-        
-        <div id="score-panel">
-            <div>💀 KILLS: <span id="score">0</span></div>
-            <div style="margin-top: 5px;">⚡ WAVE: <span id="wave">1</span></div>
-        </div>
-        
-        <div id="ammo-panel">
-            <div>🔫 AMMO: <span id="ammo">30</span></div>
+    <!-- UI Overlay -->
+    <div id="ui-layer">
+        <div class="crosshair-container">
+            <div class="crosshair-line h-line"></div>
+            <div class="crosshair-line v-line"></div>
+            <div class="crosshair"></div>
         </div>
 
-        <div id="debug-panel">
-            <div style="color: #ff0; margin-bottom: 5px; font-weight: bold;">🔧 DEBUG INFO</div>
-            <div>GPS: <span id="gps-status">Waiting...</span></div>
-            <div>Lat: <span id="user-lat">-</span></div>
-            <div>Lng: <span id="user-lng">-</span></div>
-            <div>Zombies: <span id="zombie-count">0</span> (<span id="zombie-alive">0</span> alive)</div>
-            <div>Last Hit: <span id="last-hit">None</span></div>
+        <div id="score-panel" class="hud-panel">
+            <div class="hud-label">Kills Confirmed</div>
+            <div class="hud-value" id="score">0</div>
         </div>
-        
-        <div id="game-over">
-            <h1>💀 GAME OVER!</h1>
-            <p style="font-size: 28px;">Total Kills: <span id="final-score">0</span></p>
-            <p style="font-size: 24px;">Wave Reached: <span id="final-wave">1</span></p>
-            <button id="restart-btn">🔄 MAIN LAGI</button>
+
+        <div id="wave-panel" class="hud-panel">
+            <div class="hud-label">Threat Level</div>
+            <div class="hud-value">WAVE <span id="wave">1</span></div>
+        </div>
+
+        <div id="ammo-panel" class="hud-panel">
+            <div class="hud-label">Ammunition</div>
+            <div class="hud-value"><span id="ammo">30</span> / ∞</div>
+        </div>
+
+        <div id="radar-panel">
+            <div>GPS SIGNAL: <span id="gps-status" style="color:red">SEARCHING</span></div>
+            <div>TARGETS: <span id="zombie-count">0</span></div>
         </div>
     </div>
 
+    <!-- Start Screen -->
+    <div id="start-screen" class="fullscreen-overlay">
+        <h1>Zombie Protocol</h1>
+        <p>Monster terdeteksi di lokasi Anda.<br>Gunakan kamera untuk menemukan mereka.<br>Tap layar untuk menembak.</p>
+        <button class="btn" id="start-btn">INITIATE MISSION</button>
+        <p style="font-size: 12px; margin-top: 20px; color: #666;">Izinkan akses Kamera & Lokasi</p>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="fullscreen-overlay">
+        <div class="loader"></div>
+        <p style="margin-top: 20px;">Calibrating GPS Sensors...</p>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="fullscreen-overlay" style="display: none;">
+        <h1>M.I.A.</h1>
+        <p>Misi Gagal. Amunisi Habis.<br>Total Kills: <span id="final-score" style="color: #00ffff; font-weight: bold;">0</span></p>
+        <button class="btn" id="restart-btn">RETRY MISSION</button>
+    </div>
+
+    <!-- AR Scene -->
     <a-scene
         vr-mode-ui="enabled: false"
+        renderer="logarithmicDepthBuffer: true; precision: medium;"
         embedded
         arjs='sourceType: webcam; sourceWidth:1280; sourceHeight:960; displayWidth: 1280; displayHeight: 960; debugUIEnabled: false;'>
         
-        <a-camera gps-camera="minDistance: 5; maxDistance: 50;" rotation-reader></a-camera>
+        <a-assets>
+            <!-- Menggunakan Model Monster GLTF dari Khronos Group -->
+            <a-asset-item id="monster-model" src="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Monster/glTF-Binary/Monster.glb"></a-asset-item>
+            
+            <!-- Gun Sound (Optional - browser policy might block auto audio) -->
+            <!-- <audio id="gunshot" src="gunshot.mp3"></audio> -->
+        </a-assets>
+
+        <!-- Lighting -->
+        <a-light type="ambient" color="#ffffff" intensity="0.5"></a-light>
+        <a-light type="directional" color="#ffffff" intensity="1" position="-1 1 0"></a-light>
+
+        <!-- Camera with Raycaster for shooting logic -->
+        <a-camera gps-camera rotation-reader>
+            <!-- Invisible raycaster pointing forward for game logic -->
+            <!-- We handle raycasting manually in JS for better control on 'tap' -->
+        </a-camera>
+
     </a-scene>
 
     <script>
-        // Zombie AI Component
-        AFRAME.registerComponent('zombie-clickable', {
-            init: function() {
-                this.el.addEventListener('click', (ev) => {
-                    if (!this.el.userData.isDead && gameStarted && !gameOver && ammo > 0) {
-                        shootZombie(this.el);
-                    }
-                });
+        // --- Game Configuration ---
+        const CONFIG = {
+            maxZombies: 5,
+            spawnRadiusMin: 10,
+            spawnRadiusMax: 25, // meters
+            startAmmo: 25,
+            modelScale: 0.05 // Monster model is huge, scale it down
+        };
+
+        // --- State Management ---
+        let state = {
+            score: 0,
+            ammo: CONFIG.startAmmo,
+            wave: 1,
+            zombies: [], // Array of zombie elements
+            isGameRunning: false,
+            userLocation: null
+        };
+
+        // --- DOM Elements ---
+        const ui = {
+            score: document.getElementById('score'),
+            ammo: document.getElementById('ammo'),
+            wave: document.getElementById('wave'),
+            gps: document.getElementById('gps-status'),
+            zombieCount: document.getElementById('zombie-count'),
+            startScreen: document.getElementById('start-screen'),
+            loadingScreen: document.getElementById('loading-screen'),
+            gameOverScreen: document.getElementById('game-over-screen'),
+            scene: document.querySelector('a-scene'),
+            damageOverlay: document.getElementById('damage-overlay')
+        };
+
+        // --- Game Logic ---
+
+        // 1. Raycaster Implementation (Shooting)
+        const raycaster = new THREE.Raycaster();
+        const centerScreen = new THREE.Vector2(0, 0); // Normalized device coordinates for center
+
+        function shoot() {
+            if (!state.isGameRunning || state.ammo <= 0) return;
+
+            // Recoil Animation Effect
+            const crosshair = document.querySelector('.crosshair');
+            crosshair.style.transform = "scale(1.5)";
+            setTimeout(() => crosshair.style.transform = "scale(1)", 100);
+
+            // Decrease Ammo
+            state.ammo--;
+            updateHUD();
+
+            // Muzzle Flash Effect (Simple white flash)
+            ui.damageOverlay.style.boxShadow = "inset 0 0 50px rgba(255, 255, 200, 0.5)";
+            setTimeout(() => ui.damageOverlay.style.boxShadow = "none", 50);
+
+            // Raycast logic
+            const camera = document.querySelector('[gps-camera]').object3D.children[0]; // Access Three.js camera
+            if(!camera) return;
+
+            raycaster.setFromCamera(centerScreen, camera);
+            
+            // Get all zombie meshes
+            // Note: We need to intersect the mesh inside the a-entity
+            const zombieMeshes = [];
+            state.zombies.forEach(z => {
+                if(z.object3D) zombieMeshes.push(z.object3D);
+            });
+
+            const intersects = raycaster.intersectObjects(zombieMeshes, true);
+
+            if (intersects.length > 0) {
+                // Find the first object that is part of a zombie
+                const hitObject = intersects[0].object;
+                
+                // Traverse up to find the a-entity wrapper
+                let entity = hitObject.el;
+                // Sometimes hitObject is a mesh inside the entity, bubble up
+                while(entity && !entity.classList.contains('zombie')) {
+                    entity = entity.parentNode;
+                }
+
+                if (entity && entity.classList.contains('zombie')) {
+                    hitZombie(entity);
+                }
             }
-        });
 
-        // Global variables
-        let scene, camera;
-        let zombies = [];
-        let score = 0;
-        let ammo = 30;
-        let wave = 1;
-        let gameStarted = false;
-        let gameOver = false;
-        let userPosition = null;
-        
-        const MAX_ZOMBIES = 8;
-        const SPAWN_INTERVAL = 3500;
-        const ZOMBIE_SPAWN_RADIUS_MIN = 5; // meters
-        const ZOMBIE_SPAWN_RADIUS_MAX = 15; // meters
-        let spawnTimer;
-
-        // Utility: Calculate destination point given distance and bearing
-        function destinationPoint(lat, lon, distance, bearing) {
-            const R = 6371e3; // Earth radius in meters
-            const φ1 = lat * Math.PI / 180;
-            const λ1 = lon * Math.PI / 180;
-            const θ = bearing * Math.PI / 180;
-
-            const φ2 = Math.asin(
-                Math.sin(φ1) * Math.cos(distance / R) +
-                Math.cos(φ1) * Math.sin(distance / R) * Math.cos(θ)
-            );
-
-            const λ2 = λ1 + Math.atan2(
-                Math.sin(θ) * Math.sin(distance / R) * Math.cos(φ1),
-                Math.cos(distance / R) - Math.sin(φ1) * Math.sin(φ2)
-            );
-
-            return {
-                lat: φ2 * 180 / Math.PI,
-                lng: λ2 * 180 / Math.PI
-            };
-        }
-
-        // Update debug info
-        function updateDebug(id, value) {
-            const el = document.getElementById(id);
-            if (el) el.textContent = value;
-        }
-
-        // Create zombie entity
-        function createZombie() {
-            const zombie = document.createElement('a-entity');
-            zombie.classList.add('zombie');
-            zombie.setAttribute('zombie-clickable', '');
-            
-            // Body
-            const body = document.createElement('a-cylinder');
-            body.setAttribute('radius', '0.4');
-            body.setAttribute('height', '1.0');
-            body.setAttribute('color', '#3d5e3d');
-            body.setAttribute('position', '0 0.5 0');
-            zombie.appendChild(body);
-
-            // Head
-            const head = document.createElement('a-box');
-            head.setAttribute('width', '0.5');
-            head.setAttribute('height', '0.5');
-            head.setAttribute('depth', '0.5');
-            head.setAttribute('color', '#527052');
-            head.setAttribute('position', '0 1.3 0');
-            zombie.appendChild(head);
-
-            // Eyes (glowing red)
-            const leftEye = document.createElement('a-sphere');
-            leftEye.setAttribute('radius', '0.08');
-            leftEye.setAttribute('color', '#ff0000');
-            leftEye.setAttribute('material', 'emissive: #ff0000; emissiveIntensity: 1.0');
-            leftEye.setAttribute('position', '-0.15 1.35 0.26');
-            zombie.appendChild(leftEye);
-
-            const rightEye = document.createElement('a-sphere');
-            rightEye.setAttribute('radius', '0.08');
-            rightEye.setAttribute('color', '#ff0000');
-            rightEye.setAttribute('material', 'emissive: #ff0000; emissiveIntensity: 1.0');
-            rightEye.setAttribute('position', '0.15 1.35 0.26');
-            zombie.appendChild(rightEye);
-
-            // Mouth
-            const mouth = document.createElement('a-box');
-            mouth.setAttribute('width', '0.25');
-            mouth.setAttribute('height', '0.1');
-            mouth.setAttribute('depth', '0.06');
-            mouth.setAttribute('color', '#000000');
-            mouth.setAttribute('position', '0 1.13 0.26');
-            zombie.appendChild(mouth);
-
-            // Arms
-            const leftArm = document.createElement('a-cylinder');
-            leftArm.setAttribute('radius', '0.1');
-            leftArm.setAttribute('height', '0.7');
-            leftArm.setAttribute('color', '#3d5e3d');
-            leftArm.setAttribute('position', '-0.48 0.6 0');
-            leftArm.setAttribute('rotation', '0 0 30');
-            zombie.appendChild(leftArm);
-
-            const rightArm = document.createElement('a-cylinder');
-            rightArm.setAttribute('radius', '0.1');
-            rightArm.setAttribute('height', '0.7');
-            rightArm.setAttribute('color', '#3d5e3d');
-            rightArm.setAttribute('position', '0.48 0.6 0');
-            rightArm.setAttribute('rotation', '0 0 -30');
-            zombie.appendChild(rightArm);
-
-            // Legs
-            const leftLeg = document.createElement('a-cylinder');
-            leftLeg.setAttribute('radius', '0.12');
-            leftLeg.setAttribute('height', '0.6');
-            leftLeg.setAttribute('color', '#2d4e2d');
-            leftLeg.setAttribute('position', '-0.15 -0.3 0');
-            zombie.appendChild(leftLeg);
-
-            const rightLeg = document.createElement('a-cylinder');
-            rightLeg.setAttribute('radius', '0.12');
-            rightLeg.setAttribute('height', '0.6');
-            rightLeg.setAttribute('color', '#2d4e2d');
-            rightLeg.setAttribute('position', '0.15 -0.3 0');
-            zombie.appendChild(rightLeg);
-
-            return zombie;
-        }
-
-        // Spawn zombie at GPS location
-        function spawnZombie() {
-            if (gameOver || !userPosition) return;
-
-            const zombie = createZombie();
-            
-            // Random angle and distance
-            const angle = Math.random() * 360;
-            const distance = ZOMBIE_SPAWN_RADIUS_MIN + 
-                           Math.random() * (ZOMBIE_SPAWN_RADIUS_MAX - ZOMBIE_SPAWN_RADIUS_MIN);
-            
-            // Calculate GPS coordinates
-            const zombiePos = destinationPoint(
-                userPosition.lat,
-                userPosition.lng,
-                distance,
-                angle
-            );
-
-            // Set GPS position
-            zombie.setAttribute('gps-entity-place', 
-                `latitude: ${zombiePos.lat}; longitude: ${zombiePos.lng};`
-            );
-            
-            // Scale and visibility
-            zombie.setAttribute('scale', '2 2 2');
-            
-            // User data
-            zombie.userData = {
-                health: 100,
-                isDead: false,
-                spawnTime: Date.now(),
-                distance: distance
-            };
-
-            // Add animation
-            zombie.setAttribute('animation', {
-                property: 'rotation',
-                to: '0 360 0',
-                loop: true,
-                dur: 8000,
-                easing: 'linear'
-            });
-
-            zombie.addEventListener('loaded', () => {
-                window.dispatchEvent(new CustomEvent('gps-entity-place-loaded'));
-            });
-            
-            scene.appendChild(zombie);
-            zombies.push(zombie);
-            
-            console.log(`🧟 Zombie spawned at ${distance.toFixed(1)}m, GPS: ${zombiePos.lat.toFixed(6)}, ${zombiePos.lng.toFixed(6)}`);
-            updateDebug('zombie-count', zombies.length);
-            updateDebug('zombie-alive', zombies.filter(z => !z.userData.isDead).length);
-        }
-
-        // Spawn wave
-        function spawnWave() {
-            const zombiesToSpawn = Math.min(3 + wave, MAX_ZOMBIES);
-            console.log(`🌊 Wave ${wave}: Spawning ${zombiesToSpawn} zombies`);
-            
-            for (let i = 0; i < zombiesToSpawn; i++) {
-                setTimeout(() => spawnZombie(), i * 700);
+            if (state.ammo === 0 && state.zombies.length > 0) {
+                setTimeout(checkGameOver, 1000);
             }
         }
 
-        // Shoot zombie
-        function shootZombie(zombie) {
-            if (!zombie || zombie.userData.isDead || gameOver || ammo <= 0) return;
+        function hitZombie(entity) {
+            if (entity.dataset.dead === "true") return;
 
-            ammo--;
-            document.getElementById('ammo').textContent = ammo;
-
-            // Muzzle flash
-            const flash = document.createElement('div');
-            flash.className = 'muzzle-flash';
-            document.getElementById('ui-overlay').appendChild(flash);
-            setTimeout(() => flash.remove(), 200);
-
-            // Hit zombie
-            zombie.userData.health -= 50;
+            // Health logic could go here, for now 1 shot = 1 kill
+            entity.dataset.dead = "true";
+            
+            // Visual feedback
             showHitMarker();
-            updateDebug('last-hit', `HIT @ ${new Date().toLocaleTimeString()}`);
             
-            // Flash effect
-            const head = zombie.querySelector('a-box');
-            if (head) {
-                head.setAttribute('color', '#ff3333');
-                setTimeout(() => head.setAttribute('color', '#527052'), 150);
-            }
+            // Play death animation if available, or just shrink
+            // For this GLB model, we might not have easy access to mixer, so we scale down
+            entity.setAttribute('animation', {
+                property: 'scale',
+                to: '0 0 0',
+                dur: 500,
+                easing: 'easeInBack'
+            });
 
-            console.log(`💥 Hit! Health: ${zombie.userData.health}`);
-
-            if (zombie.userData.health <= 0) {
-                killZombie(zombie);
-            }
-
-            if (ammo <= 0) {
-                setTimeout(checkGameOver, 1500);
-            }
+            setTimeout(() => {
+                if (entity.parentNode) entity.parentNode.removeChild(entity);
+                state.zombies = state.zombies.filter(z => z !== entity);
+                state.score++;
+                updateHUD();
+                
+                if (state.zombies.length === 0) {
+                    startNextWave();
+                }
+            }, 500);
         }
 
-        // Show hit marker
         function showHitMarker() {
             const marker = document.createElement('div');
-            marker.className = 'hit-marker';
-            marker.textContent = '✕';
-            marker.style.left = '50%';
+            marker.className = 'hit-indicator';
+            marker.innerText = "HIT!";
             marker.style.top = '50%';
-            document.getElementById('ui-overlay').appendChild(marker);
-            setTimeout(() => marker.remove(), 600);
+            marker.style.left = '50%';
+            document.body.appendChild(marker);
+            setTimeout(() => marker.remove(), 800);
         }
 
-        // Kill zombie
-        function killZombie(zombie) {
-            zombie.userData.isDead = true;
-            score++;
-            document.getElementById('score').textContent = score;
-            
-            console.log(`☠️ Zombie killed! Score: ${score}`);
+        // 2. Spawning System
+        function spawnZombie() {
+            if (!state.userLocation) return;
 
-            // Death animation
-            let scale = 2;
-            const deathInterval = setInterval(() => {
-                scale *= 0.82;
-                zombie.setAttribute('scale', `${scale} ${scale} ${scale}`);
-                
-                if (scale < 0.15) {
-                    clearInterval(deathInterval);
-                    if (zombie.parentNode) {
-                        zombie.parentNode.removeChild(zombie);
-                    }
-                    zombies = zombies.filter(z => z !== zombie);
-                    
-                    updateDebug('zombie-count', zombies.length);
-                    updateDebug('zombie-alive', zombies.filter(z => !z.userData.isDead).length);
-                    
-                    const aliveCount = zombies.filter(z => !z.userData.isDead).length;
-                    if (aliveCount === 0 && !gameOver) {
-                        nextWave();
-                    }
-                }
-            }, 35);
+            const zombie = document.createElement('a-entity');
+            zombie.classList.add('zombie');
+            
+            // Calculate random GPS offset
+            const angle = Math.random() * Math.PI * 2;
+            const distance = CONFIG.spawnRadiusMin + Math.random() * (CONFIG.spawnRadiusMax - CONFIG.spawnRadiusMin);
+            
+            // Approximate lat/lng offset (1 degree ~ 111km)
+            const latOffset = (Math.cos(angle) * distance) / 111111;
+            const lngOffset = (Math.sin(angle) * distance) / (111111 * Math.cos(state.userLocation.latitude * Math.PI / 180));
+            
+            const lat = state.userLocation.latitude + latOffset;
+            const lng = state.userLocation.longitude + lngOffset;
+
+            // Set GPS Place
+            zombie.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lng}`);
+            
+            // Look at camera (always face player)
+            zombie.setAttribute('look-at', '[gps-camera]');
+
+            // 3D Model Container
+            const modelWrapper = document.createElement('a-entity');
+            // FIX: Offset Y to -1.6 (approx eye level) to make it look grounded
+            modelWrapper.setAttribute('position', '0 -1.6 0'); 
+            
+            // GLTF Model
+            modelWrapper.setAttribute('gltf-model', '#monster-model');
+            modelWrapper.setAttribute('scale', `${CONFIG.modelScale} ${CONFIG.modelScale} ${CONFIG.modelScale}`);
+            
+            // Animation (A-Frame extras animation-mixer to play embedded animations)
+            modelWrapper.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1');
+
+            zombie.appendChild(modelWrapper);
+            ui.scene.appendChild(zombie);
+            state.zombies.push(zombie);
+            updateHUD();
         }
 
-        // Next wave
-        function nextWave() {
-            wave++;
-            document.getElementById('wave').textContent = wave;
-            ammo += 20;
-            document.getElementById('ammo').textContent = ammo;
+        function startNextWave() {
+            state.wave++;
+            state.ammo += 10; // Bonus ammo
             
-            console.log(`🎯 Wave ${wave} complete! Bonus ammo!`);
-            
-            setTimeout(() => spawnWave(), 3000);
+            // Visual Notification
+            const announcement = document.createElement('div');
+            announcement.style.cssText = "position:fixed; top:30%; width:100%; text-align:center; color:#ffaa00; font-size:40px; font-weight:bold; text-shadow:0 0 20px black; z-index:20; pointer-events:none;";
+            announcement.innerText = `WAVE ${state.wave}`;
+            document.body.appendChild(announcement);
+            setTimeout(() => announcement.remove(), 3000);
+
+            // Spawn loop
+            const count = Math.min(state.wave + 2, CONFIG.maxZombies);
+            for(let i=0; i<count; i++) {
+                setTimeout(spawnZombie, i * 1000); // Stagger spawns
+            }
+            updateHUD();
         }
 
-        // Check game over
         function checkGameOver() {
-            const aliveZombies = zombies.filter(z => !z.userData.isDead).length;
-            if (ammo <= 0 && aliveZombies > 0) {
-                gameOver = true;
-                clearInterval(spawnTimer);
-                document.getElementById('final-score').textContent = score;
-                document.getElementById('final-wave').textContent = wave;
-                document.getElementById('game-over').style.display = 'block';
-                
-                console.log('💀 GAME OVER!');
+            if (state.ammo <= 0 && state.zombies.length > 0) {
+                state.isGameRunning = false;
+                document.getElementById('final-score').innerText = state.score;
+                ui.gameOverScreen.style.display = 'flex';
+                ui.uiLayer.style.display = 'none';
             }
         }
 
-        // Initialize game
-        function initializeGame(position) {
-            scene = document.querySelector('a-scene');
-            camera = document.querySelector('[gps-camera]');
+        function updateHUD() {
+            ui.score.innerText = state.score;
+            ui.ammo.innerText = state.ammo;
+            ui.wave.innerText = state.wave;
+            ui.zombieCount.innerText = state.zombies.length;
             
-            userPosition = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude
-            };
-
-            updateDebug('gps-status', '✓ Connected');
-            updateDebug('user-lat', userPosition.lat.toFixed(6));
-            updateDebug('user-lng', userPosition.lng.toFixed(6));
-
-            console.log('📍 User location:', userPosition);
-            
-            gameStarted = true;
-
-            // Spawn first wave
-            setTimeout(() => spawnWave(), 2000);
-
-            // Auto spawn
-            spawnTimer = setInterval(() => {
-                if (zombies.length < MAX_ZOMBIES && gameStarted && !gameOver) {
-                    spawnZombie();
-                }
-            }, SPAWN_INTERVAL);
-
-            // Enable screen shooting
-            document.body.addEventListener('click', (e) => {
-                if (e.target.tagName !== 'BUTTON' && gameStarted && !gameOver && ammo > 0) {
-                    // Screen tap shooting disabled, use zombie click instead
-                }
-            });
+            if (state.ammo <= 5) ui.ammo.style.color = 'red';
+            else ui.ammo.style.color = '#ff0000';
         }
 
-        // Start button
-        document.getElementById('start-btn').addEventListener('click', () => {
-            document.getElementById('instructions').style.display = 'none';
-            document.getElementById('loading').style.display = 'block';
+        // --- Initialization ---
 
-            // Get GPS location
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    document.getElementById('loading').style.display = 'none';
-                    document.getElementById('ui-overlay').style.display = 'block';
-                    
-                    initializeGame(position);
-                },
-                (error) => {
-                    console.error('GPS Error:', error);
-                    alert('❌ Tidak dapat mengakses GPS!\nPastikan izin lokasi diaktifkan.');
-                    location.reload();
-                },
-                {
-                    enableHighAccuracy: true,
-                    maximumAge: 0,
-                    timeout: 27000
-                }
-            );
+        function initGame(position) {
+            state.userLocation = position.coords;
+            ui.gps.innerText = "LOCKED";
+            ui.gps.style.color = "#00ff00";
+            
+            state.isGameRunning = true;
+            ui.loadingScreen.style.display = 'none';
+            
+            // Enable Tap to Shoot
+            window.addEventListener('click', shoot);
+            window.addEventListener('touchstart', (e) => {
+                // Prevent default touch behavior (zooming/scrolling) if necessary
+                // e.preventDefault(); 
+                shoot();
+            }, {passive: false});
+
+            // Start First Wave
+            startNextWave();
+        }
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            ui.startScreen.style.display = 'none';
+            ui.loadingScreen.style.display = 'flex';
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    initGame,
+                    (err) => {
+                        alert("GPS Error: " + err.message);
+                        ui.loadingScreen.style.display = 'none';
+                        ui.startScreen.style.display = 'flex';
+                    },
+                    { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
+                );
+            } else {
+                alert("Browser tidak mendukung Geolocation.");
+            }
         });
 
-        // Restart button
         document.getElementById('restart-btn').addEventListener('click', () => {
             location.reload();
         });
+
     </script>
 </body>
 </html>
