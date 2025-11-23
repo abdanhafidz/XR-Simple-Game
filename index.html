@@ -4,599 +4,508 @@
     <meta charset='utf-8'>
     <meta http-equiv='X-UA-Compatible' content='IE=edge'>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>AR Zombie Shooter: Apocalypse</title>
+    <title>AR Zombie Shooter: Final Project</title>
     
-    <!-- Libraries -->
+    <!-- Libraries A-Frame & AR.js -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js'></script>
     <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
-    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
-
+    
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     
     <style>
-        /* RESET & LAYOUT */
+        /* RESET */
         html, body {
             margin: 0; padding: 0; width: 100%; height: 100%;
             overflow: hidden; background-color: #000;
         }
 
-        /* VIDEO FIX */
+        /* FULLSCREEN VIDEO FIX */
         #arjs-video, video {
             width: 100% !important; height: 100% !important;
             top: 0 !important; left: 0 !important;
             z-index: -2 !important; object-fit: cover !important;
-            margin: 0 !important; transform: none !important;
-            position: absolute !important; min-width: 100%; min-height: 100%;
+            margin: 0 !important; position: absolute !important;
         }
 
-        /* CANVAS */
-        .a-canvas {
-            width: 100% !important; height: 100% !important;
-            top: 0 !important; left: 0 !important;
-            position: absolute !important; z-index: 1 !important;
-        }
-
-        /* UI LAYER */
+        /* UI LAYER & ANIMATIONS */
         #ui-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 999;
             display: flex; flex-direction: column; justify-content: space-between;
-            overflow: hidden;
+            transition: transform 0.1s; /* Untuk efek shake */
         }
 
-        /* DAMAGE FLASH EFFECT */
+        /* EFEK GETAR (SHAKE) SAAT KENA HIT */
+        .shake-anim {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        /* DAMAGE FLASH (EFEK DARAH LEBIH INTENS) */
         #damage-flash {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: red; opacity: 0; pointer-events: none; z-index: 900;
-            transition: opacity 0.1s;
+            /* Gradient merah pekat di pinggir, agak merah di tengah */
+            background: radial-gradient(circle, rgba(255, 0, 0, 0.2) 20%, rgba(255, 0, 0, 0.9) 100%);
+            opacity: 0; pointer-events: none; z-index: 900;
+            transition: opacity 0.1s ease-out;
+            mix-blend-mode: multiply; /* Membuat efek merah menyatu dengan kamera */
         }
 
-        /* HUD TOP */
-        .hud-top {
-            display: flex; justify-content: space-between; padding: 20px; width: 100%; box-sizing: border-box;
-            padding-top: max(20px, env(safe-area-inset-top));
+        /* LOW HEALTH PULSE (BERKEDIP SAAT SEKARAT) */
+        .critical-health {
+            animation: pulseRed 1s infinite alternate;
         }
 
+        @keyframes pulseRed {
+            from { opacity: 0.3; }
+            to { opacity: 0.7; }
+        }
+
+        /* HUD STYLING (Sci-Fi) */
         .hud-panel {
-            background: rgba(0, 15, 30, 0.85);
-            border: 1px solid rgba(0, 255, 255, 0.4);
-            padding: 10px 20px;
-            transform: skewX(-15deg);
-            display: flex; flex-direction: column; align-items: center; min-width: 90px;
-            backdrop-filter: blur(4px);
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+            background: rgba(10, 20, 30, 0.85);
+            border: 1px solid rgba(0, 255, 255, 0.5);
+            padding: 10px; transform: skewX(-15deg);
+            display: flex; flex-direction: column; align-items: center;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
         }
-
-        .hud-content { transform: skewX(15deg); text-align: center; }
 
         .hud-label { 
-            font-size: 10px; color: #00ffff; 
-            font-family: 'Share Tech Mono', monospace; 
-            letter-spacing: 2px; margin-bottom: 2px;
-            text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+            font-size: 10px; color: #00ffff; font-family: 'Share Tech Mono', monospace; 
+            transform: skewX(15deg); letter-spacing: 1px;
         }
-        
         .hud-value { 
-            font-size: 28px; color: #fff; 
-            font-weight: 900; 
-            font-family: 'Orbitron', sans-serif; 
-            text-shadow: 0 0 10px rgba(0, 255, 255, 0.8); 
+            font-size: 24px; color: #fff; font-family: 'Orbitron', sans-serif; font-weight: 900;
+            transform: skewX(15deg); text-shadow: 0 0 5px #0ff;
         }
 
-        .score-box { border-left: 5px solid #00ffff; }
-        .wave-box { border-right: 5px solid #ffaa00; }
-        .wave-box .hud-label { color: #ffaa00; }
-        .wave-box .hud-value { color: #ffaa00; }
-        
-        /* BOTTOM AREA (HEALTH & AMMO) */
+        /* Layout Positions */
+        .hud-top {
+            display: flex; justify-content: space-between; padding: 20px;
+            padding-top: max(20px, env(safe-area-inset-top));
+        }
         .hud-bottom {
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-between;
-            padding: 20px;
-            width: 100%;
-            box-sizing: border-box;
+            display: flex; align-items: flex-end; justify-content: space-between; padding: 20px;
             padding-bottom: max(20px, env(safe-area-inset-bottom));
         }
 
-        /* HEALTH BAR */
-        .health-container {
-            width: 200px;
-            transform: skewX(-15deg);
-        }
-        .health-label {
-            font-family: 'Orbitron'; font-size: 12px; color: #fff;
-            margin-bottom: 5px; transform: skewX(15deg); text-shadow: 0 0 5px red;
-        }
-        .health-bar-bg {
-            width: 100%; height: 15px; background: rgba(50,0,0,0.8);
-            border: 1px solid #ff0000;
-        }
-        .health-bar-fill {
-            width: 100%; height: 100%; background: #ff0000;
-            box-shadow: 0 0 10px #ff0000;
-            transition: width 0.2s;
-        }
+        /* Health Bar */
+        .health-container { width: 180px; transform: skewX(-15deg); }
+        .health-bar-bg { width: 100%; height: 15px; background: #300; border: 2px solid #f00; box-shadow: 0 0 5px #f00; }
+        .health-bar-fill { width: 100%; height: 100%; background: #f00; transition: width 0.2s; box-shadow: inset 0 0 10px #500; }
 
-        .ammo-box { 
-            border-right: 5px solid #ff0000; 
-            background: rgba(30, 0, 0, 0.85);
-            border-color: rgba(255, 0, 0, 0.5);
-            margin-left: auto; /* Push to right */
-        }
-        .ammo-box .hud-label { color: #ff4444; }
-        .ammo-box .hud-value { color: #ff0000; font-size: 36px; }
-
-        /* RADAR */
-        .radar-container {
-            position: absolute; bottom: 80px; left: 20px; width: 100px; height: 100px;
-            background: rgba(0, 20, 0, 0.8); border: 2px solid #0f0; border-radius: 50%;
-            pointer-events: none; overflow: hidden; z-index: 150;
-            box-shadow: 0 0 15px #0f0;
-        }
-        
-        .radar-sweep {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            border-radius: 50%;
-            background: conic-gradient(from 0deg, transparent 0deg, rgba(0, 255, 0, 0.5) 40deg, transparent 40.1deg);
-            animation: radarSpin 2s linear infinite;
-        }
-        @keyframes radarSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-        .radar-center {
-            position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: #fff;
-            border-radius: 50%; transform: translate(-50%, -50%); z-index: 5;
-        }
-        .radar-blip {
-            position: absolute; width: 8px; height: 8px; background: #ff0000;
-            border-radius: 50%; transform: translate(-50%, -50%); z-index: 4;
-        }
-
-        /* CROSSHAIR */
-        .crosshair-container {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.9;
-        }
-        .crosshair { 
-            width: 40px; height: 40px; border: 2px solid #0ff; border-radius: 50%; 
-            box-shadow: 0 0 10px #0ff;
+        /* Crosshair */
+        .crosshair {
+            position: absolute; top: 50%; left: 50%;
+            width: 40px; height: 40px; border: 2px solid #0ff; border-radius: 50%;
+            transform: translate(-50%, -50%); opacity: 0.8;
+            box-shadow: 0 0 5px #0ff;
         }
         .crosshair::after {
-            content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: red;
+            content: ''; position: absolute; top: 50%; left: 50%;
+            width: 4px; height: 4px; background: red;
             transform: translate(-50%, -50%); border-radius: 50%;
         }
 
-        /* SCREENS */
+        /* Radar */
+        .radar-box {
+            position: absolute; bottom: 90px; left: 20px;
+            width: 90px; height: 90px; border: 2px solid #0f0; border-radius: 50%;
+            background: rgba(0, 20, 0, 0.7); overflow: hidden;
+            box-shadow: 0 0 10px #0f0;
+        }
+        .radar-center {
+            position: absolute; top: 50%; left: 50%; width: 4px; height: 4px;
+            background: #fff; transform: translate(-50%, -50%); border-radius: 50%;
+        }
+        .radar-blip {
+            position: absolute; width: 8px; height: 8px; background: red;
+            border-radius: 50%; transform: translate(-50%, -50%);
+            box-shadow: 0 0 4px #fff;
+        }
+
+        /* Overlay Screens */
         .fullscreen-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.95);
+            background: rgba(0,0,0,0.95); z-index: 1000;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 9999; pointer-events: auto; text-align: center; padding: 20px;
+            text-align: center; pointer-events: auto;
         }
-        
-        h1 {
-            font-family: 'Orbitron', sans-serif; color: #f00; font-size: 32px;
-            text-shadow: 0 0 20px #f00; letter-spacing: 2px; margin-bottom: 10px;
-        }
-
-        p {
-            font-family: 'Share Tech Mono', monospace; color: #0ff; 
-            font-size: 14px; margin-bottom: 30px; line-height: 1.6;
-        }
-
         .btn {
-            background: linear-gradient(45deg, #cc0000, #990000); 
-            color: white; padding: 15px 40px; border: none;
-            font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 18px;
-            border: 2px solid #f00;
-            clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
-            margin: 10px; cursor: pointer; text-transform: uppercase; letter-spacing: 2px;
-            box-shadow: 0 0 15px rgba(255, 0, 0, 0.4);
-        }
-        
-        #debug-console {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100px;
-            background: rgba(0,0,0,0.8); color: lime; font-size: 10px;
-            z-index: 10000; overflow-y: scroll; display: none; padding: 5px; font-family: monospace; text-align: left;
+            background: #c00; color: #fff; padding: 15px 40px;
+            font-family: 'Orbitron'; font-weight: bold; border: 2px solid #f00;
+            margin-top: 20px; text-transform: uppercase; letter-spacing: 2px;
+            box-shadow: 0 0 15px #f00; cursor: pointer;
         }
     </style>
 </head>
 
 <body>
-    <div id="debug-console"></div>
+    <!-- Damage Visual Effect (Red Overlay) -->
     <div id="damage-flash"></div>
 
+    <!-- UI Overlay -->
     <div id="ui-layer">
         <div class="hud-top">
-            <div class="hud-panel score-box">
-                <div class="hud-content">
-                    <div class="hud-label">KILLS</div>
-                    <div class="hud-value" id="score">0</div>
-                </div>
+            <div class="hud-panel" style="border-left: 5px solid #0ff;">
+                <div class="hud-label">KILLS</div>
+                <div class="hud-value" id="score">0</div>
             </div>
-            
-            <div class="hud-panel wave-box">
-                <div class="hud-content">
-                    <div class="hud-label">WAVE</div>
-                    <div class="hud-value" id="wave">1</div>
-                </div>
+            <div class="hud-panel" style="border-right: 5px solid #fa0;">
+                <div class="hud-label">WAVE</div>
+                <div class="hud-value" id="wave">1</div>
             </div>
         </div>
 
-        <div class="crosshair-container">
-            <div class="crosshair"></div>
-        </div>
-
-        <div class="radar-container" id="radar">
-            <div class="radar-sweep"></div>
+        <div class="crosshair"></div>
+        
+        <div class="radar-box" id="radar">
             <div class="radar-center"></div>
         </div>
 
         <div class="hud-bottom">
             <div class="health-container">
-                <div class="health-label">INTEGRITY (HP)</div>
+                <div class="hud-label" style="color:#fff; margin-bottom:5px;">HP INTEGRITY</div>
                 <div class="health-bar-bg">
                     <div class="health-bar-fill" id="hp-bar"></div>
                 </div>
             </div>
-
-            <div class="hud-panel ammo-box">
-                <div class="hud-content">
-                    <div class="hud-label">AMMO</div>
-                    <div class="hud-value" id="ammo">25</div>
-                </div>
+            <div class="hud-panel" style="border-right: 5px solid #f00;">
+                <div class="hud-label" style="color:#f55;">AMMO</div>
+                <div class="hud-value" style="color:#f00;" id="ammo">25</div>
             </div>
         </div>
     </div>
 
     <!-- Start Screen -->
     <div id="start-screen" class="fullscreen-overlay">
-        <h1>ZOMBIE PROTOCOL</h1>
-        <p>
-            Misi: Bertahan Hidup.<br>
-            Musuh akan mengejar Anda.
+        <h1 style="font-family:'Orbitron'; color:red; text-shadow:0 0 10px red;">ZOMBIE PROTOCOL</h1>
+        <p style="color:#aaa; font-family:'Share Tech Mono'; font-size: 14px; line-height: 1.5;">
+            MUSUH MENDETEKSI KEBERADAAN ANDA.<br>
+            BERTAHAN HIDUP SEKUAT TENAGA.
         </p>
-        <button class="btn" id="start-btn">DEPLOY</button>
-        <button class="btn" style="background:none; border:1px solid #555; font-size:12px; padding:10px;" id="force-spawn-btn">⚠️ INDOOR MODE</button>
+        <button class="btn" onclick="startGame()">DEPLOY MISSION</button>
+        <button class="btn" style="margin-top:10px; background:#222; border-color:#555; font-size:10px; padding:10px;" onclick="forceStart()">⚠️ INDOOR TEST MODE</button>
     </div>
 
     <!-- Game Over Screen -->
     <div id="game-over-screen" class="fullscreen-overlay" style="display: none;">
-        <h1>M.I.A.</h1>
-        <p style="font-size: 20px;">
-            Kills: <span id="final-score" style="color: #0ff;">0</span><br>
-            Cause: <span style="color:red;">Killed in Action</span>
-        </p>
-        <button class="btn" id="restart-btn">RETRY MISSION</button>
+        <h1 style="font-family:'Orbitron'; color:red; font-size: 40px;">FATAL ERROR</h1>
+        <p style="color:#fff; font-family:'Share Tech Mono';">OPERATOR KILLED IN ACTION<br>Total Kills: <span id="final-score" style="color:#0ff; font-weight:bold;">0</span></p>
+        <button class="btn" onclick="location.reload()">REBOOT SYSTEM</button>
     </div>
 
+    <!-- AR Scene -->
     <a-scene
         vr-mode-ui="enabled: false"
         renderer="logarithmicDepthBuffer: true; precision: medium;"
         arjs='sourceType: webcam; videoTexture: true; debugUIEnabled: false;'
         loading-screen="enabled: false">
-        
-        <a-assets timeout="15000">
-            <a-asset-item id="monster-model" src="https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/BrainStem/glTF-Binary/BrainStem.glb"></a-asset-item>
+
+        <!-- Assets -->
+        <a-assets timeout="10000">
+            <!-- Model BrainStem untuk animasi jalan yang stabil -->
+            <a-asset-item id="zombie-model" src="https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/BrainStem/glTF-Binary/BrainStem.glb"></a-asset-item>
         </a-assets>
 
-        <a-light type="ambient" color="#ffffff" intensity="1.0"></a-light>
-        <a-light type="directional" color="#ffffff" intensity="1.5" position="-1 1 0"></a-light>
+        <!-- Lighting -->
+        <a-light type="ambient" color="#fff" intensity="1.0"></a-light>
+        <a-light type="directional" color="#fff" intensity="1.5" position="-1 1 0"></a-light>
 
+        <!-- Camera -->
         <a-camera gps-camera rotation-reader far="1000"></a-camera>
     </a-scene>
 
     <script>
-        // --- LOGGING ---
-        const debugConsole = document.getElementById('debug-console');
-        function log(msg) {
-            console.log(msg);
-            const div = document.createElement('div');
-            div.textContent = "> " + msg;
-            debugConsole.appendChild(div);
-            debugConsole.scrollTop = debugConsole.scrollHeight;
-        }
-
-        // --- CONFIG ---
+        // --- CONFIGURATION ---
         const CONFIG = {
-            maxZombies: 5,
-            spawnRadiusMin: 4, 
-            spawnRadiusMax: 8,
-            startAmmo: 25,
-            modelScale: 3, // DIBESARKAN (Tadinya 1.5)
-            radarRange: 20,
-            maxHealth: 100,
-            zombieSpeed: 0.03, // Kecepatan gerak zombie
-            attackRange: 2.0   // Jarak hit
+            speed: 0.05,        // Kecepatan jalan zombie
+            hitDistance: 2.0,   // Jarak hit (meter)
+            spawnDistMin: 4,    // Spawn jarak minimal
+            spawnDistMax: 8,    // Spawn jarak maksimal
+            maxHp: 100,
+            damage: 5           // Damage per hit (lebih sakit biar kerasa)
         };
 
-        let state = {
-            score: 0, ammo: CONFIG.startAmmo, wave: 1, health: CONFIG.maxHealth,
-            zombies: [], isGameRunning: false, userLocation: null
+        // --- STATE ---
+        let gameState = {
+            running: false,
+            score: 0,
+            ammo: 25,
+            wave: 1,
+            hp: 100,
+            zombies: []
         };
 
-        const ui = {
-            radar: document.getElementById('radar'),
-            score: document.getElementById('score'),
-            ammo: document.getElementById('ammo'),
-            wave: document.getElementById('wave'),
-            hpBar: document.getElementById('hp-bar'),
-            damageFlash: document.getElementById('damage-flash'),
-            startScreen: document.getElementById('start-screen'),
-            gameOverScreen: document.getElementById('game-over-screen'),
-            scene: document.querySelector('a-scene')
-        };
+        // --- ZOMBIE BEHAVIOR COMPONENT ---
+        AFRAME.registerComponent('zombie-ai', {
+            init: function() {
+                // Posisi Y -1.5 agar kaki robot menapak di "tanah" (asumsi kamera di 1.6m)
+                this.el.object3D.position.y = -1.5; 
+            },
+            tick: function() {
+                if (!gameState.running || this.el.dataset.dead === "true") return;
 
-        // --- GAME LOOP (Movement & Logic) ---
-        // Kita gunakan interval untuk logika pergerakan
-        setInterval(() => {
-            if (!state.isGameRunning) return;
-            
-            updateRadar();
-            updateZombies();
-        }, 100);
+                const zombiePos = this.el.object3D.position;
+                const camera = document.querySelector('[gps-camera]').object3D;
+                const camPos = camera.position;
 
-        function updateZombies() {
-            const cameraEl = document.querySelector('[gps-camera]');
-            if (!cameraEl) return;
-            const camPos = cameraEl.object3D.position; // Posisi player di dunia 3D lokal
+                // 1. HITUNG JARAK
+                const dist = zombiePos.distanceTo(camPos);
 
-            state.zombies.forEach(zombie => {
-                const zPos = zombie.object3D.position;
-                
-                // 1. Hitung Jarak
-                // Jarak Euclidean di ruang lokal
-                const dist = zPos.distanceTo(camPos);
-                
-                // 2. Logika Gerak (Chase)
-                // Zombie selalu 'look-at' kamera, jadi vector forward (-Z) mengarah ke player (kurang lebih)
-                // Kita gerakkan dia mendekat di sumbu lokal Z
-                if (dist > 1.5) { // Stop jika terlalu dekat (collision)
-                    // Gerakkan zombie mendekati 0,0,0 (posisi awal player)
-                    // Karena AR.js menggerakkan kamera, zombie diam di world. 
-                    // Kita tarik zombie mendekati posisi kamera saat ini.
+                // 2. LOGIKA MOVEMENT (CHASE)
+                // Jika zombie > 1 meter, dia mengejar
+                if (dist > 1.2) { 
+                    this.el.object3D.lookAt(camPos.x, zombiePos.y, camPos.z);
                     
                     const dir = new THREE.Vector3();
-                    dir.subVectors(camPos, zPos).normalize(); // Arah ke player
+                    dir.subVectors(camPos, zombiePos).normalize();
+                    dir.y = 0; // Kunci sumbu Y agar tidak terbang
                     
-                    // Update posisi
-                    zombie.object3D.position.addScaledVector(dir, CONFIG.zombieSpeed);
+                    this.el.object3D.position.addScaledVector(dir, CONFIG.speed);
                 }
 
-                // 3. Logika Attack (Hit Player)
-                if (dist < CONFIG.attackRange) {
-                    playerTakeDamage(5); // Kurangi 5 HP
+                // 3. LOGIKA HIT (DAMAGE)
+                // Hanya hit jika cooldown damage selesai (biar ga langsung mati instan)
+                if (dist <= CONFIG.hitDistance) {
+                    if (!this.lastHit || Date.now() - this.lastHit > 1000) { // Hit setiap 1 detik
+                        takeDamage(CONFIG.damage);
+                        this.lastHit = Date.now();
+                        // Efek mundur sedikit saat nyerang biar realistis
+                        // this.el.object3D.translateZ(-0.5); 
+                    }
                 }
-            });
-        }
+            }
+        });
 
-        function playerTakeDamage(amount) {
-            state.health -= amount;
-            
-            // Visual Effect
-            ui.damageFlash.style.opacity = 0.8;
-            setTimeout(() => ui.damageFlash.style.opacity = 0, 100);
+        // --- GAME FUNCTIONS ---
 
-            // Update UI
-            const hpPercent = Math.max(0, (state.health / CONFIG.maxHealth) * 100);
-            ui.hpBar.style.width = `${hpPercent}%`;
-            
-            if (state.health <= 0) {
-                gameOver("KILLED IN ACTION");
+        function startGame() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    initGame(pos.coords);
+                }, (err) => {
+                    alert("GPS Error. Memulai Mode Indoor.");
+                    forceStart();
+                });
+            } else {
+                forceStart();
             }
         }
 
-        // --- RADAR SYSTEM ---
-        function updateRadar() {
-            // Hapus blip lama
-            document.querySelectorAll('.radar-blip').forEach(b => b.remove());
-
-            const cameraEl = document.querySelector('[gps-camera]');
-            if (!cameraEl) return;
-            
-            const camY = cameraEl.getAttribute('rotation').y; 
-            const userHeadingRad = THREE.Math.degToRad(camY);
-
-            state.zombies.forEach(zombie => {
-                const zPos = zombie.object3D.position;
-                // Jarak di local space
-                const dist = Math.sqrt(zPos.x*zPos.x + zPos.z*zPos.z);
-                const angle = Math.atan2(zPos.x, zPos.z);
-
-                if (dist > CONFIG.radarRange) return;
-
-                const relativeAngle = angle - userHeadingRad;
-                const radarRadius = 50; // Setengah lebar radar container
-                const blipDist = (dist / CONFIG.radarRange) * (radarRadius - 5);
-                
-                const blipX = radarRadius + Math.sin(relativeAngle) * blipDist;
-                const blipY = radarRadius - Math.cos(relativeAngle) * blipDist;
-
-                const blip = document.createElement('div');
-                blip.className = 'radar-blip';
-                blip.style.left = `${blipX}px`; 
-                blip.style.top = `${blipY}px`;
-                ui.radar.appendChild(blip);
-            });
+        function forceStart() {
+            initGame({ latitude: 0, longitude: 0 });
         }
 
-        // --- SHOOTING ---
-        const raycaster = new THREE.Raycaster();
-        const centerScreen = new THREE.Vector2(0, 0);
+        function initGame(coords) {
+            document.getElementById('start-screen').style.display = 'none';
+            gameState.running = true;
+            gameState.userLoc = coords;
+            
+            window.addEventListener('click', shoot);
+            window.addEventListener('touchstart', shoot, {passive: false});
+
+            spawnWave();
+            setInterval(updateRadar, 200);
+        }
+
+        function spawnWave() {
+            let count = Math.min(gameState.wave + 2, 8);
+            for(let i=0; i<count; i++) {
+                setTimeout(spawnZombie, i * 1500);
+            }
+        }
+
+        function spawnZombie() {
+            const scene = document.querySelector('a-scene');
+            const zombie = document.createElement('a-entity');
+            
+            zombie.setAttribute('zombie-ai', '');
+            zombie.classList.add('zombie');
+
+            // Posisi Random Lokal
+            const angle = Math.random() * Math.PI * 2;
+            const dist = CONFIG.spawnDistMin + Math.random() * (CONFIG.spawnDistMax - CONFIG.spawnDistMin);
+            const x = Math.sin(angle) * dist;
+            const z = Math.cos(angle) * dist;
+
+            zombie.setAttribute('position', `${x} -1.5 ${z}`);
+
+            // Model Visual
+            const model = document.createElement('a-entity');
+            model.setAttribute('gltf-model', '#zombie-model');
+            model.setAttribute('scale', '1.5 1.5 1.5');
+            model.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1');
+            zombie.appendChild(model);
+
+            // Fallback Box (Wajib ada jika model error)
+            const box = document.createElement('a-box');
+            box.setAttribute('color', 'red');
+            box.setAttribute('width', '0.5'); box.setAttribute('height', '1.8'); box.setAttribute('depth', '0.5');
+            box.setAttribute('visible', 'false');
+            zombie.appendChild(box);
+
+            model.addEventListener('model-error', () => {
+                model.setAttribute('visible', 'false');
+                box.setAttribute('visible', 'true');
+            });
+
+            scene.appendChild(zombie);
+            gameState.zombies.push(zombie);
+        }
 
         function shoot() {
-            if (!state.isGameRunning || state.ammo <= 0) return;
-            state.ammo--; updateHUD();
-            
+            if (!gameState.running || gameState.ammo <= 0) return;
+
+            gameState.ammo--;
+            updateUI();
+
+            // Efek Recoil Crosshair
             const crosshair = document.querySelector('.crosshair');
-            crosshair.style.transform = "translate(-50%, -50%) scale(1.5)";
-            setTimeout(() => crosshair.style.transform = "translate(-50%, -50%) scale(1)", 100);
+            crosshair.style.transform = 'translate(-50%, -50%) scale(1.2)';
+            setTimeout(() => crosshair.style.transform = 'translate(-50%, -50%) scale(1)', 100);
 
-            const cameraEl = document.querySelector('[gps-camera]');
-            if(!cameraEl || !cameraEl.object3D) return;
-            raycaster.setFromCamera(centerScreen, cameraEl.object3D.children[0]);
+            // Raycaster
+            const raycaster = new THREE.Raycaster();
+            const center = new THREE.Vector2(0, 0);
+            const camera = document.querySelector('[gps-camera]').object3D.children[0];
             
-            const zombieMeshes = [];
-            state.zombies.forEach(z => { if(z.object3D) zombieMeshes.push(z.object3D); });
-            const intersects = raycaster.intersectObjects(zombieMeshes, true);
-
-            if (intersects.length > 0) {
-                let entity = intersects[0].object.el;
-                while(entity && (!entity.classList || !entity.classList.contains('zombie'))) {
-                    entity = entity.parentNode;
-                    if(!entity) break;
+            raycaster.setFromCamera(center, camera);
+            
+            const intersects = raycaster.intersectObjects(document.querySelector('a-scene').object3D.children, true);
+            
+            for (let i = 0; i < intersects.length; i++) {
+                let obj = intersects[i].object;
+                let parent = obj.el;
+                while (parent && !parent.classList.contains('zombie')) {
+                    parent = parent.parentNode;
                 }
-                if (entity && entity.classList.contains('zombie')) hitZombie(entity);
+                
+                if (parent && parent.classList.contains('zombie') && parent.dataset.dead !== "true") {
+                    killZombie(parent);
+                    break;
+                }
             }
-            if (state.ammo === 0 && state.zombies.length > 0) setTimeout(() => gameOver("OUT OF AMMO"), 1500);
         }
 
-        function hitZombie(entity) {
-            if (entity.dataset.dead === "true") return;
-            entity.dataset.dead = "true";
+        function killZombie(el) {
+            el.dataset.dead = "true";
+            el.setAttribute('animation', 'property: scale; to: 0 0 0; dur: 500; easing: easeInBack');
             
+            // Marker Hit
+            showHitMarker();
+
+            setTimeout(() => {
+                if (el.parentNode) el.parentNode.removeChild(el);
+                gameState.zombies = gameState.zombies.filter(z => z !== el);
+                gameState.score++;
+                updateUI();
+
+                if (gameState.zombies.length === 0) {
+                    gameState.wave++;
+                    gameState.ammo += 10;
+                    // Tampilkan notifikasi wave baru
+                    const waveNotif = document.createElement('div');
+                    waveNotif.innerText = `WAVE ${gameState.wave}`;
+                    waveNotif.style.cssText = "position:absolute; top:40%; left:50%; transform:translate(-50%,-50%); color:orange; font-size:40px; font-weight:bold; font-family:'Orbitron'; text-shadow:0 0 10px orange; pointer-events:none;";
+                    document.body.appendChild(waveNotif);
+                    setTimeout(() => waveNotif.remove(), 2000);
+                    
+                    updateUI();
+                    spawnWave();
+                }
+            }, 500);
+        }
+
+        function showHitMarker() {
             const marker = document.createElement('div');
-            marker.innerText = "CRITICAL HIT";
-            marker.style.cssText = "position:absolute; top:40%; left:50%; transform:translate(-50%,-50%); color:#f00; font-family:'Orbitron'; font-weight:900; font-size:24px; animation: floatUp 0.6s forwards; text-shadow:0 0 10px #f00; pointer-events:none; z-index:9999; border: 2px solid red; padding: 5px 10px; background:rgba(0,0,0,0.5); transform: skewX(-10deg);";
-            
-            const styleSheet = document.createElement("style");
-            styleSheet.innerText = `@keyframes floatUp { 0% { opacity:1; top:40%; } 100% { opacity:0; top:30%; } }`;
-            document.head.appendChild(styleSheet);
+            marker.style.cssText = "position:absolute; top:50%; left:50%; width:20px; height:20px; border:2px solid red; transform:translate(-50%,-50%) rotate(45deg); pointer-events:none;";
             document.body.appendChild(marker);
-            setTimeout(() => marker.remove(), 600);
-
-            entity.setAttribute('animation', { property: 'scale', to: '0 0 0', dur: 400, easing: 'easeInBack' });
-            setTimeout(() => {
-                if (entity.parentNode) entity.parentNode.removeChild(entity);
-                state.zombies = state.zombies.filter(z => z !== entity);
-                state.score++; updateHUD();
-                if (state.zombies.length === 0) startNextWave();
-            }, 400);
+            setTimeout(() => marker.remove(), 100);
         }
 
-        // --- ZOMBIE CREATION ---
-        function createZombie() {
-            const zombie = document.createElement('a-entity');
-            zombie.classList.add('zombie');
+        function takeDamage(amount) {
+            gameState.hp -= amount;
+            updateUI();
+
+            // --- 1. EFEK FLASH MERAH ---
+            const flash = document.getElementById('damage-flash');
+            flash.style.opacity = 1;
+            setTimeout(() => flash.style.opacity = 0, 250); // Durasi flash
+
+            // --- 2. EFEK LAYAR GETAR ---
+            const uiLayer = document.getElementById('ui-layer');
+            uiLayer.classList.add('shake-anim');
+            setTimeout(() => uiLayer.classList.remove('shake-anim'), 500);
+
+            // --- 3. EFEK LOW HEALTH ---
+            if (gameState.hp <= 30 && gameState.hp > 0) {
+                flash.classList.add('critical-health');
+            } else {
+                flash.classList.remove('critical-health');
+            }
+
+            if (gameState.hp <= 0) {
+                gameOver();
+            }
+        }
+
+        function gameOver() {
+            gameState.running = false;
+            document.getElementById('final-score').innerText = gameState.score;
+            document.getElementById('game-over-screen').style.display = 'flex';
+            document.getElementById('damage-flash').classList.remove('critical-health');
+            document.getElementById('damage-flash').style.opacity = 0;
+        }
+
+        function updateUI() {
+            document.getElementById('score').innerText = gameState.score;
+            document.getElementById('wave').innerText = gameState.wave;
+            document.getElementById('ammo').innerText = gameState.ammo;
             
-            const visualContainer = document.createElement('a-entity');
-            // POSISI Y DIRENDAHKAN AGAR MENAPAK TANAH (-3)
-            visualContainer.setAttribute('position', '0 -3 0');
-            zombie.appendChild(visualContainer);
+            const hpPct = Math.max(0, gameState.hp) + '%';
+            document.querySelector('.health-bar-fill').style.width = hpPct;
+        }
 
-            // 1. Model GLTF
-            const model = document.createElement('a-entity');
-            model.setAttribute('gltf-model', '#monster-model');
-            // SCALE DIBESARKAN
-            model.setAttribute('scale', `${CONFIG.modelScale} ${CONFIG.modelScale} ${CONFIG.modelScale}`);
-            model.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1');
-            visualContainer.appendChild(model);
-
-            // 2. Fallback Primitif (Jika Model Gagal)
-            const fallback = document.createElement('a-entity');
-            fallback.setAttribute('visible', 'false');
+        function updateRadar() {
+            const radar = document.getElementById('radar');
+            document.querySelectorAll('.radar-blip').forEach(b => b.remove());
             
-            // Fallback dibuat lebih besar juga agar sesuai
-            fallback.setAttribute('scale', '2 2 2'); 
+            const camera = document.querySelector('[gps-camera]').object3D;
+            const camAngle = camera.rotation.y; 
 
-            // Body parts construction (sama seperti sebelumnya tapi di scale parent)
-            const body = document.createElement('a-box'); body.setAttribute('color', '#000080'); body.setAttribute('position', '0 0.75 0'); body.setAttribute('scale', '0.6 0.7 0.3');
-            fallback.appendChild(body);
-            const head = document.createElement('a-box'); head.setAttribute('color', '#00AA00'); head.setAttribute('position', '0 1.3 0'); head.setAttribute('scale', '0.4 0.4 0.4');
-            fallback.appendChild(head);
-            const lArm = document.createElement('a-box'); lArm.setAttribute('color', '#00AA00'); lArm.setAttribute('position', '-0.4 1 0.3'); lArm.setAttribute('scale', '0.2 0.6 0.2'); lArm.setAttribute('rotation', '-90 0 0');
-            fallback.appendChild(lArm);
-            const rArm = document.createElement('a-box'); rArm.setAttribute('color', '#00AA00'); rArm.setAttribute('position', '0.4 1 0.3'); rArm.setAttribute('scale', '0.2 0.6 0.2'); rArm.setAttribute('rotation', '-90 0 0');
-            fallback.appendChild(rArm);
+            gameState.zombies.forEach(z => {
+                if(z.dataset.dead === "true") return;
+                
+                const zPos = z.object3D.position;
+                const dx = zPos.x - camera.position.x;
+                const dz = zPos.z - camera.position.z;
+                
+                const rX = dx * Math.cos(camAngle) - dz * Math.sin(camAngle);
+                const rZ = dx * Math.sin(camAngle) + dz * Math.cos(camAngle);
 
-            visualContainer.appendChild(fallback);
+                const scale = 3; 
+                const uiX = 45 + (rX * scale);
+                const uiY = 45 + (rZ * scale); 
 
-            model.addEventListener('model-error', () => { 
-                model.setAttribute('visible', 'false'); 
-                fallback.setAttribute('visible', 'true'); 
+                const dist = Math.sqrt((uiX-45)**2 + (uiY-45)**2);
+                if (dist < 45) {
+                    const blip = document.createElement('div');
+                    blip.className = 'radar-blip';
+                    blip.style.left = uiX + 'px';
+                    blip.style.top = uiY + 'px';
+                    radar.appendChild(blip);
+                }
             });
-            
-            return zombie;
         }
-
-        function spawnGPS() {
-            if (!state.userLocation) return;
-            const zombie = createZombie();
-            const angle = Math.random() * Math.PI * 2;
-            const dist = CONFIG.spawnRadiusMin + Math.random() * (CONFIG.spawnRadiusMax - CONFIG.spawnRadiusMin);
-            const latOffset = (Math.cos(angle) * dist) / 111111;
-            const lngOffset = (Math.sin(angle) * dist) / (111111 * Math.cos(state.userLocation.latitude * Math.PI / 180));
-            
-            zombie.setAttribute('gps-entity-place', `latitude: ${state.userLocation.latitude + latOffset}; longitude: ${state.userLocation.longitude + lngOffset}`);
-            zombie.setAttribute('look-at', '[gps-camera]');
-            ui.scene.appendChild(zombie);
-            state.zombies.push(zombie);
-            log(`Spawn GPS: ${dist.toFixed(1)}m`);
-        }
-
-        function spawnLocal() {
-            const zombie = createZombie();
-            const angle = Math.random() * Math.PI * 2;
-            const dist = 4; // Start distance
-            zombie.setAttribute('position', `${Math.sin(angle)*dist} 0 ${Math.cos(angle)*dist}`);
-            zombie.setAttribute('look-at', '[gps-camera]');
-            ui.scene.appendChild(zombie);
-            state.zombies.push(zombie);
-            log(`Spawn Local: ${dist}m`);
-        }
-
-        function startNextWave() {
-            state.wave++; state.ammo += 10; updateHUD();
-            const count = Math.min(state.wave + 1, CONFIG.maxZombies);
-            for(let i=0; i<count; i++) setTimeout(spawnLocal, i * 2000); // Pakai Local spawn dulu biar stabil untuk test
-        }
-
-        function gameOver(reason) {
-            state.isGameRunning = false;
-            document.getElementById('final-score').innerText = state.score;
-            ui.gameOverScreen.querySelector('p span').nextElementSibling.innerText = reason || "M.I.A.";
-            ui.gameOverScreen.style.display = 'flex';
-        }
-
-        function updateHUD() {
-            ui.score.innerText = state.score;
-            ui.ammo.innerText = state.ammo;
-            ui.wave.innerText = state.wave;
-        }
-
-        function init(pos) {
-            state.userLocation = pos.coords;
-            state.isGameRunning = true;
-            ui.startScreen.style.display = 'none';
-            window.addEventListener('click', shoot);
-            window.addEventListener('touchstart', (e) => shoot(), {passive: false});
-            
-            // Kita spawn zombie pertama
-            spawnLocal();
-            // Lalu wave berikutnya
-            setTimeout(() => {
-                if(state.zombies.length === 0) startNextWave();
-            }, 5000);
-        }
-
-        document.getElementById('start-btn').addEventListener('click', () => {
-            log("GPS Init...");
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(init, (err) => alert("GPS Error: " + err.message), { enableHighAccuracy: true });
-            } else alert("No GPS Support");
-        });
-
-        document.getElementById('force-spawn-btn').addEventListener('click', () => {
-            ui.startScreen.style.display = 'none';
-            state.isGameRunning = true;
-            state.userLocation = { latitude: 0, longitude: 0 }; // Dummy
-            window.addEventListener('click', shoot);
-            window.addEventListener('touchstart', (e) => shoot(), {passive: false});
-            spawnLocal();
-        });
-
-        document.getElementById('restart-btn').addEventListener('click', () => location.reload());
     </script>
 </body>
 </html>
