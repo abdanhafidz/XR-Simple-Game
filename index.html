@@ -196,8 +196,8 @@
         // ZOMBIE AI COMPONENT
         AFRAME.registerComponent('zombie-ai', {
             init: function() {
-                // UPDATE: Posisi Y = 0 sesuai request (Menapak di level kamera)
-                this.el.object3D.position.y = 0; 
+                // FIX: Menurunkan posisi Y ke -3 agar terlihat menapak di tanah (jauh di bawah kamera)
+                this.el.object3D.position.y = -3; 
             },
             tick: function() {
                 if (!gameState.running || this.el.dataset.dead === "true") return;
@@ -280,12 +280,12 @@
             const x = Math.sin(angle) * dist;
             const z = Math.cos(angle) * dist;
 
-            // Posisi awal di Y=0
-            zombie.setAttribute('position', `${x} 0 ${z}`);
+            // Posisi awal di Y=-3 (sesuai setting AI)
+            zombie.setAttribute('position', `${x} -3 ${z}`);
 
             const model = document.createElement('a-entity');
             model.setAttribute('gltf-model', '#zombie-model');
-            // UPDATE: SCALE DIPERBESAR JADI 8x
+            // SCALE DIPERBESAR JADI 8x
             model.setAttribute('scale', '8 8 8');
             model.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1');
             zombie.appendChild(model);
