@@ -183,8 +183,8 @@
 
         <a-camera gps-camera rotation-reader far="1000">
             <!-- PISTOL 3D RAKSASA (Procedural) -->
-            <!-- Scale 3x agar besar -->
-            <a-entity id="player-gun" position="0.5 -0.5 -1.5" rotation="0 0 0" scale="3 3 3" visible="false">
+            <!-- UPDATE: Scale diperbesar jadi 8x -->
+            <a-entity id="player-gun" position="0.5 -0.5 -1.5" rotation="0 0 0" scale="8 8 8" visible="false">
                 <!-- Gun Body (Main) -->
                 <a-box color="#1a1a1a" width="0.12" height="0.15" depth="0.5" position="0 0 0"></a-box>
                 <!-- Top Rail -->
@@ -208,9 +208,11 @@
     <script>
         // CONFIG
         const CONFIG = {
-            spawnDistMin: 30, spawnDistMax: 60,
+            // UPDATE: JARAK SPAWN JAUH (50-100 METER)
+            spawnDistMin: 50, 
+            spawnDistMax: 100,
             modelScale: 15, yOffset: -20,
-            radarScale: 0.5,
+            radarScale: 0.3, // Radar scale dikecilkan karena map luas
             damageDistance: 8.0,
             damageAmount: 10,
             startAmmo: 25
@@ -247,43 +249,32 @@
                 const wrist = landmarks[0];
                 const indexTip = landmarks[8]; // Ujung Telunjuk
                 
-                // Simpan posisi untuk raycasting (0..1)
                 handState.x = indexTip.x;
                 handState.y = indexTip.y;
 
-                // Update Cursor 2D (Hijau)
                 cursor.style.left = `${indexTip.x * 100}%`;
                 cursor.style.top = `${indexTip.y * 100}%`;
 
-                // --- LOGIKA MAPPING PISTOL 3D (FIX ROTASI) ---
+                // --- LOGIKA MAPPING PISTOL (LEBIH RESPONSIF) ---
                 if (gunEntity) {
-                    // Mapping Posisi
-                    // Tangan kanan di layar -> Pistol di kanan
-                    const gunX = (wrist.x - 0.5) * 3.0; // Scale faktor lebar
-                    const gunY = -(wrist.y - 0.5) * 2.0 - 0.5; // Offset ke bawah sedikit
+                    // UPDATE: Multiplier lebih besar agar jangkauan pistol luas
+                    const gunX = (wrist.x - 0.5) * 4.0; 
+                    const gunY = -(wrist.y - 0.5) * 3.0 - 0.5; 
                     
                     gunEntity.object3D.position.x = gunX;
                     gunEntity.object3D.position.y = gunY;
                     
-                    // FIX ROTASI: Arahkan moncong pistol ke Kursor
-                    // Kita hitung sudut antara "Posisi Pistol (Wrist)" dan "Target (Index Tip)"
+                    // Rotasi
                     const dx = indexTip.x - wrist.x;
                     const dy = indexTip.y - wrist.y;
-                    
-                    // Hitung sudut rotasi Z (Miring)
-                    // +90 derajat karena default atan2 0 itu ke kanan, tapi pistol kita tegak
                     const angleDeg = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
                     
-                    // Rotasi Z (Roll)
                     gunEntity.object3D.rotation.z = THREE.Math.degToRad(angleDeg);
                     
-                    // Rotasi Y (Yaw) - Agar moncong menunjuk ke tengah/kiri/kanan
-                    // Semakin ke kiri kursor, semakin putar ke kiri
-                    const yaw = (handState.x - 0.5) * -0.8; 
+                    const yaw = (handState.x - 0.5) * -1.2; 
                     gunEntity.object3D.rotation.y = yaw;
                     
-                    // Sedikit Pitch (Nunduk/Dongak)
-                    const pitch = (handState.y - 0.5) * 0.5;
+                    const pitch = (handState.y - 0.5) * 0.8;
                     gunEntity.object3D.rotation.x = pitch;
                 }
 
@@ -292,7 +283,6 @@
                 cursor.classList.remove('active');
                 if(gunEntity) gunEntity.setAttribute('visible', 'false'); 
                 status.style.display = 'block';
-                status.innerText = "TANGAN TIDAK TERDETEKSI";
             }
         }
 
@@ -308,7 +298,6 @@
                 const dz = zPos.z - camPos.z;
                 const dist = Math.sqrt(dx*dx + dz*dz);
 
-                // Chase
                 if (dist > 5) { 
                     this.el.object3D.lookAt(camPos.x, zPos.y, camPos.z);
                     const dir = new THREE.Vector3();
@@ -317,7 +306,6 @@
                     this.el.object3D.position.addScaledVector(dir, 0.08);
                 }
                 
-                // Damage
                 if (dist <= CONFIG.damageDistance) {
                     if(!this.lastHit || Date.now() - this.lastHit > 1000) {
                         takeDamage(CONFIG.damageAmount);
@@ -336,12 +324,10 @@
             spawnWave();
             setInterval(updateRadar, 100);
             
-            // Event Listeners
             const fireBtn = document.getElementById('fire-btn');
             fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); shoot(); });
             fireBtn.addEventListener('click', shoot);
             
-            // Tap layar bebas
             window.addEventListener('touchstart', (e) => { 
                 if(e.target.id !== 'fire-btn') shoot(); 
             }, {passive: false});
@@ -349,7 +335,6 @@
 
         function startCameraPipe() {
             const arVideo = document.querySelector('video');
-            // Polling sampai video AR.js siap
             if (arVideo && arVideo.readyState >= 2) {
                 async function frame() {
                     if (gameState.running) {
@@ -363,7 +348,8 @@
             }
         }
 
-        function spawnWave() { for(let i=0; i<5; i++) spawnZombie(); }
+        // UPDATE: Spawn cuma 2 zombie per wave di awal
+        function spawnWave() { for(let i=0; i<2; i++) spawnZombie(); }
 
         function spawnZombie() {
             const scene = document.querySelector('a-scene');
@@ -403,22 +389,18 @@
             gameState.ammo--;
             updateHUD();
 
-            // Recoil
             const gunEntity = document.getElementById('player-gun');
             if(gunEntity) {
                 const originalZ = gunEntity.object3D.position.z;
-                // Mundur sedikit
-                gunEntity.object3D.position.z += 0.2; // Recoil lebih kuat karena pistol besar
+                gunEntity.object3D.position.z += 0.2;
                 const flash = document.getElementById('muzzle-flash-3d');
                 if(flash) flash.setAttribute('visible', 'true');
                 setTimeout(() => {
-                    // Balik posisi
                     gunEntity.object3D.position.z -= 0.2;
                     if(flash) flash.setAttribute('visible', 'false');
                 }, 50);
             }
 
-            // Raycast Logic
             const raycaster = new THREE.Raycaster();
             const camera = document.querySelector('[gps-camera]').object3D.children[0];
             
@@ -449,7 +431,7 @@
             setTimeout(() => {
                 if (el.parentNode) el.parentNode.removeChild(el);
                 gameState.zombies = gameState.zombies.filter(z => z !== el);
-                if(gameState.zombies.length < 3) spawnZombie();
+                if(gameState.zombies.length < 2) spawnZombie();
             }, 500);
         }
 
