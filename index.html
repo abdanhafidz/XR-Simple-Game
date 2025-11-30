@@ -7,7 +7,6 @@
     <title>AR Zombie Shooter: Cyberpunk Edition (WebXR 6DoF)</title>
     
     <!-- Libraries -->
-    <!-- A-Frame 1.4.0 supports WebXR nicely -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
     
@@ -29,7 +28,6 @@
             touch-action: manipulation;
         }
         
-        /* Video Element untuk MediaPipe (Hidden/Background processing) */
         #input-video {
             position: absolute; top: 0; left: 0; width: 1px; height: 1px; opacity: 0;
             z-index: -10;
@@ -42,11 +40,11 @@
             display: flex; flex-direction: column; justify-content: space-between;
         }
 
-        /* Damage Overlay */
+        /* Damage Overlay - Z-Index dinaikkan agar di atas segalanya saat aktif */
         #damage-flash {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle, transparent 30%, rgba(255, 0, 0, 0.9) 100%);
-            opacity: 0; transition: opacity 0.1s; pointer-events: none; z-index: 900;
+            background: radial-gradient(circle, transparent 30%, rgba(255, 0, 0, 0.8) 100%);
+            opacity: 0; transition: opacity 0.1s; pointer-events: none; z-index: 2000;
             mix-blend-mode: overlay;
         }
 
@@ -119,17 +117,14 @@
             transform: translate(-50%, -50%); opacity: 0; 
             box-shadow: 0 0 15px #0f0, inset 0 0 10px #0f0; pointer-events: none;
             display: flex; align-items: center; justify-content: center;
-            transition: opacity 0.2s;
+            transition: opacity 0.2s, border-color 0.2s;
         }
-        .crosshair.active { opacity: 1; }
+        /* Saat tracking aktif */
+        .crosshair.active { opacity: 1; border-color: #0f0; box-shadow: 0 0 15px #0f0; }
+        /* Saat tracking hilang (Merah) */
+        .crosshair.lost { opacity: 0.5; border-color: #f00; box-shadow: 0 0 15px #f00; }
+
         .crosshair::after { content: ''; width: 4px; height: 4px; background: #fff; border-radius: 50%; }
-        /* Target lines for crosshair */
-        .crosshair::before {
-            content: ''; position: absolute; width: 100%; height: 100%;
-            background: linear-gradient(to bottom, transparent 48%, #0f0 48%, #0f0 52%, transparent 52%),
-                        linear-gradient(to right, transparent 48%, #0f0 48%, #0f0 52%, transparent 52%);
-            opacity: 0.5;
-        }
 
         #hand-status {
             position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%);
@@ -137,6 +132,8 @@
             text-align: center; text-shadow: 0 0 5px #00ffff; pointer-events: none;
             background: rgba(0,0,0,0.7); padding: 10px 20px; border-radius: 4px;
             border: 1px solid #00ffff;
+            /* Default hidden, hanya muncul saat start awal */
+            display: none; 
         }
 
         /* RADAR */
@@ -147,7 +144,7 @@
             box-shadow: 0 0 10px #0f0; pointer-events: auto;
         }
         .radar-center { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: #fff; transform: translate(-50%, -50%); border-radius: 50%; }
-        .radar-blip { position: absolute; width: 6px; height: 6px; background: red; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 4px #fff; }
+        .radar-blip { position: absolute; width: 8px; height: 8px; background: red; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 4px #fff; z-index: 10; }
 
         /* BUTTONS */
         #fire-btn {
@@ -179,17 +176,13 @@
             transition: transform 0.2s;
         }
         .btn-start:hover { transform: scale(1.05); }
-        
-        #xr-warning {
-            color: orange; font-family: sans-serif; font-size: 12px; margin-top: 10px; display: none;
-        }
     </style>
 </head>
 
 <body>
-    <!-- Hidden Video for MediaPipe -->
     <video id="input-video" autoplay playsinline></video>
 
+    <!-- Damage Flash sekarang di luar UI Layer tapi Z-index tinggi -->
     <div id="damage-flash"></div>
 
     <div id="ui-layer">
@@ -208,9 +201,8 @@
             </div>
         </div>
 
-        <!-- Hand Tracking Cursor -->
         <div class="crosshair" id="finger-cursor"></div>
-        <div id="hand-status">SYSTEM BOOTING...<br>Izinkan Kamera & Tunggu</div>
+        <div id="hand-status">Menunggu Start...</div>
         
         <div class="radar-box" id="radar"><div class="radar-center"></div></div>
         <div id="fire-btn">FIRE</div>
@@ -229,7 +221,6 @@
         </div>
     </div>
 
-    <!-- Start Screen -->
     <div id="start-screen" class="fullscreen-overlay">
         <h1 style="font-family:'Orbitron'; color:red; font-size: 40px; text-shadow: 0 0 20px red;">ZOMBIE PROTOCOL</h1>
         <p style="color:#aaa; font-family:'Share Tech Mono'; margin-bottom: 10px;">
@@ -240,7 +231,6 @@
             2. Angkat jari untuk membidik.<br>
             3. Tekan tombol FIRE untuk menembak.
         </p>
-        <div id="xr-warning">Note: Hand Tracking mungkin melambat saat mode AR aktif.</div>
         <button class="btn-start" onclick="startGame()">ENTER AR WORLD</button>
     </div>
 
@@ -250,27 +240,20 @@
         <button class="btn-start" onclick="location.reload()">REBOOT SYSTEM</button>
     </div>
 
-    <!-- A-Frame Scene Configured for WebXR (No GPS) -->
     <a-scene 
         webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #ui-layer"
         renderer="antialias: true; colorManagement: true; logarithmicDepthBuffer: true;"
         loading-screen="enabled: false">
 
-        <!-- Assets -->
         <a-assets>
             <a-asset-item id="titan-model" src="https://raw.githack.com/KhronosGroup/glTF-Sample-Models/master/2.0/CesiumMan/glTF-Binary/CesiumMan.glb"></a-asset-item>
         </a-assets>
 
-        <!-- Lighting -->
         <a-light type="ambient" color="#fff" intensity="0.6"></a-light>
         <a-light type="directional" color="#0ff" intensity="1.2" position="-1 2 0"></a-light>
 
-        <!-- Camera Rig for WebXR -->
-        <!-- Posisi 0 0 0 adalah titik awal dunia saat game dimulai -->
         <a-entity id="rig" position="0 0 0">
             <a-camera id="player-camera" position="0 1.6 0" look-controls="enabled: true">
-                <!-- PISTOL 3D PROCEDURAL -->
-                <!-- Menempel pada kamera (Head Locked) atau Tangan -->
                 <a-entity id="player-gun" position="0.2 -0.3 -0.5" rotation="0 0 0" scale="1 1 1" visible="false">
                     <a-box color="#111" width="0.08" height="0.12" depth="0.3" position="0 0 0"></a-box>
                     <a-cylinder color="#333" radius="0.03" height="0.4" rotation="90 0 0" position="0 0.05 -0.2"></a-cylinder>
@@ -282,19 +265,17 @@
             </a-camera>
         </a-entity>
         
-        <!-- Floor (Invisible for physics/shadows if needed) -->
         <a-plane rotation="-90 0 0" width="100" height="100" color="#000" opacity="0"></a-plane>
 
     </a-scene>
 
     <script>
-        // CONFIG
         const CONFIG = {
-            spawnDistMin: 5, spawnDistMax: 12, // Jarak spawn lebih dekat (meter)
-            modelScale: 10,  // Skala Titan (Cukup besar tapi proporsional)
-            yOffset: 0,      // 0 = LANTAI dalam WebXR (Penting!)
-            radarScale: 4.0, // Skala radar disesuaikan untuk jarak dekat
-            damageDistance: 2.5, // Jarak serang zombie
+            spawnDistMin: 5, spawnDistMax: 12,
+            modelScale: 10,  
+            yOffset: -10,    // FIX: Diturunkan drastis ke -10 agar kaki menapak tanah
+            radarScale: 4.0, 
+            damageDistance: 8.0, // FIX: Jarak serangan diperbesar (range badan Titan)
             startAmmo: 50,
             lerpFactor: 0.5 
         };
@@ -303,38 +284,33 @@
         let handData = { rawX: 0.5, rawY: 0.5, x: 0.5, y: 0.5, detected: false };
         let shootableObjects = []; 
 
-        // --- CAMERA INIT (MANUAL FOR MEDIAPIPE) ---
         async function initCamera() {
+            const status = document.getElementById('hand-status');
+            if(status) { status.style.display = 'block'; status.innerHTML = "Initializing Camera..."; }
+            
             const video = document.getElementById('input-video');
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: 'environment',
-                        width: { ideal: 640 },
-                        height: { ideal: 480 }
-                    }
+                    video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
                 });
                 video.srcObject = stream;
                 return new Promise(resolve => {
-                    video.onloadedmetadata = () => {
-                        video.play();
-                        resolve(video);
-                    };
+                    video.onloadedmetadata = () => { video.play(); resolve(video); };
                 });
             } catch (err) {
                 console.error("Camera Init Error:", err);
-                document.getElementById('hand-status').innerHTML = "CAMERA ERROR<br>Refused or Busy";
-                // Lanjut game tanpa hands jika error (WebXR only mode)
+                if(status) status.innerHTML = "CAMERA ERROR";
                 return null;
             }
         }
 
-        // --- UTILS: LERP ---
         function lerp(start, end, amt) { return (1 - amt) * start + amt * end; }
 
-        // --- HAND TRACKING SETUP ---
         let hands;
         function setupMediaPipe() {
+            const status = document.getElementById('hand-status');
+            if(status) status.innerHTML = "Loading AI...";
+            
             hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
             hands.setOptions({
                 maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5
@@ -349,63 +325,55 @@
 
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 handData.detected = true;
-                status.style.display = 'none';
+                // FIX: Sembunyikan status agar tidak menghalangi
+                if(status) status.style.display = 'none';
+                
                 cursor.classList.add('active');
+                cursor.classList.remove('lost');
                 if(gun) gun.setAttribute('visible', 'true');
 
                 const landmarks = results.multiHandLandmarks[0];
                 const indexTip = landmarks[8]; 
-                
-                // Normalisasi Koordinat
                 handData.rawX = 1.0 - indexTip.x; 
                 handData.rawY = indexTip.y;
             } else {
                 handData.detected = false;
+                // FIX: Jangan sembunyikan zombie, hanya ubah cursor jadi merah
                 cursor.classList.remove('active');
-                status.style.display = 'block';
-                status.innerHTML = "LOST TRACKING<br>Angkat Tangan";
+                cursor.classList.add('lost');
+                
+                // Jangan tampilkan overlay "Menunggu" yang besar, biarkan game terlihat
+                if(status) status.style.display = 'none'; 
             }
         }
 
-        // --- GAME LOOP & SMOOTHING ---
         function gameLoop() {
             if (!gameState.running) return;
 
-            // 1. Smooth Hand Movement
             if (handData.detected) {
                 handData.x = lerp(handData.x, handData.rawX, CONFIG.lerpFactor);
                 handData.y = lerp(handData.y, handData.rawY, CONFIG.lerpFactor);
             }
 
-            // 2. Update UI
             const cursor = document.getElementById('finger-cursor');
             cursor.style.left = `${handData.x * 100}%`;
             cursor.style.top = `${handData.y * 100}%`;
 
-            // 3. Update Gun Position (Local Space to Camera)
             const gun = document.getElementById('player-gun');
             if (gun) {
                 const targetX = (handData.x - 0.5) * 1.5; 
                 const targetY = -(handData.y - 0.5) * 1.2; 
-                
                 gun.object3D.position.x = lerp(gun.object3D.position.x, targetX + 0.2, 0.1);
                 gun.object3D.position.y = lerp(gun.object3D.position.y, targetY - 0.25, 0.1);
-                
-                // Tilt Effect
                 gun.object3D.rotation.y = (-targetX * 0.5) + 0.1; 
                 gun.object3D.rotation.x = targetY * 0.4;
                 gun.object3D.rotation.z = 0.1; 
             }
-
             requestAnimationFrame(gameLoop);
         }
 
-        // --- TITAN ZOMBIE AI ---
         AFRAME.registerComponent('titan-ai', {
-            init: function() { 
-                // Set posisi Y ke 0 (Lantai) saat init
-                this.el.object3D.position.y = CONFIG.yOffset; 
-            },
+            init: function() { this.el.object3D.position.y = CONFIG.yOffset; },
             tick: function() {
                 if (!gameState.running || this.el.dataset.dead === "true") return;
                 
@@ -413,48 +381,36 @@
                 const camEl = document.getElementById('player-camera');
                 if(!camEl) return;
 
-                // Ambil World Position kamera (karena kamera bergerak di WebXR)
                 const camPos = new THREE.Vector3();
                 camEl.object3D.getWorldPosition(camPos);
                 
-                // Hitung jarak
                 const dx = zPos.x - camPos.x;
                 const dz = zPos.z - camPos.z;
                 const dist = Math.sqrt(dx*dx + dz*dz);
 
-                // Chase Logic (Hanya sumbu X dan Z, Y tetap di lantai)
                 if (dist > 1.5) {
                     this.el.object3D.lookAt(camPos.x, CONFIG.yOffset, camPos.z);
                     const dir = new THREE.Vector3(dx, 0, dz).normalize().negate(); 
-                    this.el.object3D.position.addScaledVector(dir, 0.03); // Speed (Meter per frame)
+                    this.el.object3D.position.addScaledVector(dir, 0.03); 
                 }
 
-                // Attack Logic
+                // FIX: Logika serangan menggunakan CONFIG.damageDistance yang diperbesar (8.0)
                 if (dist <= CONFIG.damageDistance) {
                     if (!this.lastHit || Date.now() - this.lastHit > 1000) {
                         takeDamage(10);
                         this.lastHit = Date.now();
-                        // Shake effect
-                        const ui = document.getElementById('ui-layer');
-                        ui.style.transform = "translate(5px, 5px)";
-                        setTimeout(() => ui.style.transform = "none", 50);
                     }
                 }
             }
         });
 
-        // --- CORE FUNCTIONS ---
         async function startGame() {
             document.getElementById('start-screen').style.display = 'none';
             gameState.running = true;
             
-            // 1. Init Manual Camera untuk MediaPipe
             const videoEl = await initCamera();
-            
-            // 2. Setup MediaPipe
             setupMediaPipe();
             
-            // 3. Process Video Loop
             if(videoEl) {
                 async function processVideo() {
                     if (!gameState.running) return;
@@ -468,7 +424,6 @@
             spawnWave();
             setInterval(updateRadar, 150);
 
-            // Inputs
             const fireBtn = document.getElementById('fire-btn');
             const handler = (e) => { e.preventDefault(); shoot(); };
             fireBtn.addEventListener('touchstart', handler, {passive: false});
@@ -483,25 +438,21 @@
             zombie.setAttribute('titan-ai', '');
             zombie.classList.add('zombie');
 
-            // Spawn di sekitar titik 0,0,0 (Start Position)
-            // Bukan di kamera, agar saat player jalan, zombie tetap di tempat (World Locking)
             const angle = Math.random() * Math.PI * 2;
             const dist = CONFIG.spawnDistMin + Math.random() * (CONFIG.spawnDistMax - CONFIG.spawnDistMin);
             
             zombie.setAttribute('position', {
                 x: Math.sin(angle) * dist,
-                y: CONFIG.yOffset, // LANTAI
+                y: CONFIG.yOffset,
                 z: Math.cos(angle) * dist
             });
 
-            // Model
             const model = document.createElement('a-entity');
             model.setAttribute('gltf-model', '#titan-model');
             model.setAttribute('scale', `${CONFIG.modelScale} ${CONFIG.modelScale} ${CONFIG.modelScale}`);
             model.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1.5');
             zombie.appendChild(model);
 
-            // Hitbox
             const geometry = new THREE.BoxGeometry(0.5 * CONFIG.modelScale, 2 * CONFIG.modelScale, 0.5 * CONFIG.modelScale);
             const material = new THREE.MeshBasicMaterial({ visible: false }); 
             const hitboxMesh = new THREE.Mesh(geometry, material);
@@ -519,7 +470,6 @@
             if (!gameState.running || gameState.ammo <= 0) return;
             gameState.ammo--; updateHUD();
 
-            // FX
             const gun = document.getElementById('player-gun');
             const flash = document.getElementById('muzzle-flash');
             if(gun) {
@@ -531,7 +481,6 @@
                 }, 80);
             }
 
-            // Raycasting
             let hitFound = false;
             const raycaster = new THREE.Raycaster();
             const camEl = document.getElementById('player-camera');
@@ -551,15 +500,12 @@
                 }
             }
 
-            // Aim Assist (Screen Space)
             if (!hitFound) {
                 gameState.zombies.forEach(zombie => {
                     if (hitFound || zombie.dataset.dead === "true") return;
-                    
                     const pos = new THREE.Vector3();
                     zombie.object3D.getWorldPosition(pos);
                     pos.project(threeCamera);
-
                     const dist = Math.sqrt((pos.x - x)**2 + (pos.y - y)**2);
                     if (dist < 0.25 && pos.z < 1) {
                         killZombie(zombie, null);
@@ -588,8 +534,11 @@
         function takeDamage(amt) {
             gameState.hp -= amt;
             updateHUD();
+            // FIX: Efek Flash Merah pasti muncul
             const flash = document.getElementById('damage-flash');
-            flash.style.opacity = 1; setTimeout(() => flash.style.opacity = 0, 200);
+            flash.style.opacity = 1; 
+            setTimeout(() => flash.style.opacity = 0, 200);
+            
             if (gameState.hp <= 0) {
                 gameState.running = false;
                 document.getElementById('game-over-screen').style.display = 'flex';
@@ -606,15 +555,16 @@
             const radar = document.getElementById('radar');
             radar.innerHTML = '<div class="radar-center"></div>';
             
+            // FIX: Referensi kamera lebih robust
             const camEl = document.getElementById('player-camera');
             if (!camEl) return;
 
-            const cam = camEl.object3D;
+            // Pastikan getWorldPosition valid
             const camPos = new THREE.Vector3();
-            cam.getWorldPosition(camPos);
+            camEl.object3D.getWorldPosition(camPos);
             
             const vec = new THREE.Vector3();
-            cam.getWorldDirection(vec);
+            camEl.object3D.getWorldDirection(vec);
             const angle = Math.atan2(vec.x, vec.z);
 
             gameState.zombies.forEach(z => {
@@ -627,8 +577,9 @@
                 const rx = dx * Math.cos(angle) - dz * Math.sin(angle);
                 const rz = dx * Math.sin(angle) + dz * Math.cos(angle);
                 
-                const px = 50 + (rx * CONFIG.radarScale * 2.5); // Adjusted scale
-                const py = 50 - (rz * CONFIG.radarScale * 2.5);
+                // Gunakan radarScale dari config
+                const px = 50 + (rx * CONFIG.radarScale * 2.0); 
+                const py = 50 - (rz * CONFIG.radarScale * 2.0);
                 
                 if (Math.sqrt((px-50)**2 + (py-50)**2) < 45) {
                     const blip = document.createElement('div');
