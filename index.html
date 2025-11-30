@@ -28,9 +28,13 @@
             touch-action: manipulation;
         }
         
+        /* FIX HAND TRACKING: Video harus memiliki ukuran fisik agar diproses browser */
         #input-video {
-            position: absolute; top: 0; left: 0; width: 1px; height: 1px; opacity: 0;
+            position: absolute; top: 0; left: 0; 
+            width: 640px; height: 480px; /* Ukuran fixed agar rasio aspek benar */
+            opacity: 0.01; /* Hampir transparan tapi tetap dirender */
             z-index: -10;
+            pointer-events: none;
         }
 
         /* UI LAYER */
@@ -40,7 +44,7 @@
             display: flex; flex-direction: column; justify-content: space-between;
         }
 
-        /* Damage Overlay - Z-Index dinaikkan agar di atas segalanya saat aktif */
+        /* Damage Overlay */
         #damage-flash {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: radial-gradient(circle, transparent 30%, rgba(255, 0, 0, 0.8) 100%);
@@ -119,9 +123,7 @@
             display: flex; align-items: center; justify-content: center;
             transition: opacity 0.2s, border-color 0.2s;
         }
-        /* Saat tracking aktif */
         .crosshair.active { opacity: 1; border-color: #0f0; box-shadow: 0 0 15px #0f0; }
-        /* Saat tracking hilang (Merah) */
         .crosshair.lost { opacity: 0.5; border-color: #f00; box-shadow: 0 0 15px #f00; }
 
         .crosshair::after { content: ''; width: 4px; height: 4px; background: #fff; border-radius: 50%; }
@@ -132,7 +134,6 @@
             text-align: center; text-shadow: 0 0 5px #00ffff; pointer-events: none;
             background: rgba(0,0,0,0.7); padding: 10px 20px; border-radius: 4px;
             border: 1px solid #00ffff;
-            /* Default hidden, hanya muncul saat start awal */
             display: none; 
         }
 
@@ -180,9 +181,9 @@
 </head>
 
 <body>
+    <!-- Video Element Diperbaiki Ukuran dan Visibilitasnya -->
     <video id="input-video" autoplay playsinline></video>
 
-    <!-- Damage Flash sekarang di luar UI Layer tapi Z-index tinggi -->
     <div id="damage-flash"></div>
 
     <div id="ui-layer">
@@ -273,9 +274,9 @@
         const CONFIG = {
             spawnDistMin: 5, spawnDistMax: 12,
             modelScale: 10,  
-            yOffset: -10,    // FIX: Diturunkan drastis ke -10 agar kaki menapak tanah
+            yOffset: -30,    // FIX: Diturunkan EKSTREM ke -30
             radarScale: 4.0, 
-            damageDistance: 8.0, // FIX: Jarak serangan diperbesar (range badan Titan)
+            damageDistance: 8.0, 
             startAmmo: 50,
             lerpFactor: 0.5 
         };
@@ -291,6 +292,10 @@
             const video = document.getElementById('input-video');
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
+                    // FIX: Prefer rear camera first for logic, but hand tracking needs visibility
+                    // MediaPipe usually works best if we feed it what the user sees or front camera if selfie mode
+                    // For back camera AR, hand tracking is tricky. We'll stick to 'environment' (back)
+                    // but ensure video element size is readable.
                     video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
                 });
                 video.srcObject = stream;
@@ -325,7 +330,6 @@
 
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 handData.detected = true;
-                // FIX: Sembunyikan status agar tidak menghalangi
                 if(status) status.style.display = 'none';
                 
                 cursor.classList.add('active');
@@ -338,11 +342,9 @@
                 handData.rawY = indexTip.y;
             } else {
                 handData.detected = false;
-                // FIX: Jangan sembunyikan zombie, hanya ubah cursor jadi merah
                 cursor.classList.remove('active');
                 cursor.classList.add('lost');
                 
-                // Jangan tampilkan overlay "Menunggu" yang besar, biarkan game terlihat
                 if(status) status.style.display = 'none'; 
             }
         }
@@ -394,7 +396,6 @@
                     this.el.object3D.position.addScaledVector(dir, 0.03); 
                 }
 
-                // FIX: Logika serangan menggunakan CONFIG.damageDistance yang diperbesar (8.0)
                 if (dist <= CONFIG.damageDistance) {
                     if (!this.lastHit || Date.now() - this.lastHit > 1000) {
                         takeDamage(10);
@@ -534,7 +535,6 @@
         function takeDamage(amt) {
             gameState.hp -= amt;
             updateHUD();
-            // FIX: Efek Flash Merah pasti muncul
             const flash = document.getElementById('damage-flash');
             flash.style.opacity = 1; 
             setTimeout(() => flash.style.opacity = 0, 200);
@@ -555,11 +555,9 @@
             const radar = document.getElementById('radar');
             radar.innerHTML = '<div class="radar-center"></div>';
             
-            // FIX: Referensi kamera lebih robust
             const camEl = document.getElementById('player-camera');
             if (!camEl) return;
 
-            // Pastikan getWorldPosition valid
             const camPos = new THREE.Vector3();
             camEl.object3D.getWorldPosition(camPos);
             
@@ -577,7 +575,6 @@
                 const rx = dx * Math.cos(angle) - dz * Math.sin(angle);
                 const rz = dx * Math.sin(angle) + dz * Math.cos(angle);
                 
-                // Gunakan radarScale dari config
                 const px = 50 + (rx * CONFIG.radarScale * 2.0); 
                 const py = 50 - (rz * CONFIG.radarScale * 2.0);
                 
