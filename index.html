@@ -255,6 +255,7 @@
 
         <a-entity id="rig" position="0 0 0">
             <a-camera id="player-camera" position="0 1.6 0" look-controls="enabled: true">
+                <!-- Pistol Position Optimized for Portrait: 0.15, -0.3, -0.5 -->
                 <a-entity id="player-gun" position="0.15 -0.3 -0.5" rotation="0 0 0" scale="1.5 1.5 1.5" visible="true">
                     <a-box color="#111" width="0.08" height="0.12" depth="0.3" position="0 0 0"></a-box>
                     <a-cylinder color="#333" radius="0.03" height="0.4" rotation="90 0 0" position="0 0.05 -0.2"></a-cylinder>
@@ -272,10 +273,10 @@
 
     <script>
         const CONFIG = {
-            spawnDistMin: 15, spawnDistMax: 30, // Mundurkan spawn point agar tidak terlalu dekat dengan ukuran raksasa
-            modelScale: 40,  // SUPER TITAN SIZE
-            yOffset: 0,      // Lantai Default (Local Floor)
-            damageDistance: 6.0, // Jangkauan Hitbox diperbesar
+            spawnDistMin: 15, spawnDistMax: 30, 
+            modelScale: 40,  // Scale Titan
+            yOffset: 0,      
+            damageDistance: 6.0, 
             startAmmo: 50,
             lerpFactor: 0.3 
         };
@@ -284,22 +285,33 @@
         let handData = { rawX: 0.5, rawY: 0.5, x: 0.5, y: 0.5, detected: false };
         let shootableObjects = []; 
 
+        // Non-blocking Init Camera
         async function initCamera() {
             const status = document.getElementById('status-log');
             status.innerText = "Init Camera...";
             
             const video = document.getElementById('input-video');
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
+                // Jangan await di sini jika ini dipanggil di tengah proses lain
+                // Tapi untuk kepastian, kita pasang timeout
+                const streamPromise = navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
                 });
+
+                // Timeout 3 detik, kalau kelamaan anggap gagal (karena AR ambil alih)
+                const stream = await Promise.race([
+                    streamPromise,
+                    new Promise((_, reject) => setTimeout(() => reject("Timeout"), 3000))
+                ]);
+
                 video.srcObject = stream;
-                return new Promise(resolve => {
+                await new Promise(resolve => {
                     video.onloadedmetadata = () => { video.play(); resolve(video); };
                 });
+                return video;
             } catch (err) {
-                console.warn("Camera access failed/refused. Falling back to Head Aim.");
-                status.innerText = "Hand Tracking Disabled";
+                console.warn("Camera failed or taken by WebXR:", err);
+                status.innerText = "Mode: Head Aiming (Tap to Shoot)";
                 return null;
             }
         }
@@ -308,7 +320,6 @@
 
         let hands;
         function setupMediaPipe() {
-            document.getElementById('status-log').innerText = "Loading AI...";
             hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
             hands.setOptions({
                 maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5
@@ -383,7 +394,7 @@
                 const dz = zPos.z - camPos.z;
                 const dist = Math.sqrt(dx*dx + dz*dz);
 
-                if (dist > 3.0) { // Berhenti sedikit lebih jauh agar tidak menembus kamera
+                if (dist > 3.0) { 
                     this.el.object3D.lookAt(camPos.x, CONFIG.yOffset, camPos.z);
                     const dir = new THREE.Vector3(dx, 0, dz).normalize().negate(); 
                     this.el.object3D.position.addScaledVector(dir, 0.02); 
@@ -398,14 +409,34 @@
             }
         });
 
-        async function startGame() {
+        // 1. START GAME TIDAK MENUNGGU KAMERA
+        function startGame() {
             document.getElementById('start-screen').style.display = 'none';
             gameState.running = true;
             
+            // Spawn zombie DULUAN
+            spawnWave();
+            setInterval(updateRadar, 150);
+            gameLoop();
+
+            // Setup Listeners
+            const scene = document.querySelector('a-scene');
+            scene.addEventListener('select', () => shoot());
+            window.addEventListener('click', (e) => {
+                if(e.target.classList.contains('btn-start')) return;
+                shoot();
+            });
+            const fireBtn = document.getElementById('fire-btn');
+            fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); shoot(); }, {passive:false});
+
+            // Baru coba init kamera & AI di background
+            initAndSetupAI();
+        }
+
+        async function initAndSetupAI() {
             const videoEl = await initCamera();
-            setupMediaPipe();
-            
             if(videoEl) {
+                setupMediaPipe();
                 async function processVideo() {
                     if (!gameState.running) return;
                     try { await hands.send({image: videoEl}); } catch (e) {}
@@ -413,21 +444,6 @@
                 }
                 processVideo();
             }
-
-            gameLoop();
-            spawnWave();
-            setInterval(updateRadar, 150);
-
-            const scene = document.querySelector('a-scene');
-            scene.addEventListener('select', () => shoot());
-            
-            window.addEventListener('click', (e) => {
-                if(e.target.classList.contains('btn-start')) return;
-                shoot();
-            });
-            
-            const fireBtn = document.getElementById('fire-btn');
-            fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); shoot(); }, {passive:false});
         }
 
         function spawnWave() { for(let i=0; i<3; i++) setTimeout(spawnTitan, i * 1000); }
