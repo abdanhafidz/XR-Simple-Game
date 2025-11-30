@@ -261,7 +261,8 @@
         <a-camera gps-camera rotation-reader far="5000">
             <!-- PISTOL 3D PROCEDURAL (Neon Style) -->
             <!-- Adjusted Position and Scale for Mobile Visibility -->
-            <a-entity id="player-gun" position="0.2 -0.3 -0.5" rotation="0 0 0" scale="1 1 1" visible="false">
+            <!-- Position: Lebih kiri (-0.2), Lebih depan/jauh (-1.5) -->
+            <a-entity id="player-gun" position="-0.2 -0.4 -1.5" rotation="0 0 0" scale="1.5 1.5 1.5" visible="false">
                 <a-box color="#111" width="0.08" height="0.12" depth="0.3" position="0 0 0"></a-box>
                 <a-cylinder color="#333" radius="0.03" height="0.4" rotation="90 0 0" position="0 0.05 -0.2"></a-cylinder>
                 <a-box color="#0ff" width="0.09" height="0.02" depth="0.3" position="0 0.07 0" material="emissive: #0ff; emissiveIntensity: 2"></a-box>
@@ -367,7 +368,8 @@
                 const targetY = -(handData.y - 0.5) * 1.2; // Reduced from 3.0
                 
                 // Offset posisi agar pistol terlihat natural di tangan (bawah kanan kursor)
-                gun.object3D.position.x = lerp(gun.object3D.position.x, targetX + 0.15, 0.1);
+                // Offset X diubah dari +0.15 menjadi -0.1 agar lebih ke kiri
+                gun.object3D.position.x = lerp(gun.object3D.position.x, targetX - 0.1, 0.1);
                 gun.object3D.position.y = lerp(gun.object3D.position.y, targetY - 0.25, 0.1);
                 
                 // Rotasi pistol mengikuti kursor
