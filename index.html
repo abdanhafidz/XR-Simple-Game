@@ -279,12 +279,12 @@
         // CONFIG
         const CONFIG = {
             spawnDistMin: 40, spawnDistMax: 80,
-            modelScale: 30, yOffset: -35,
+            modelScale: 80, yOffset: -60, // DIPERBESAR & DITURUNKAN POSISINYA
             radarScale: 0.5,
-            damageDistance: 8.0,
+            damageDistance: 15.0, // Jarak damage diperbesar karena zombie lebih besar
             startAmmo: 30,
             // Smoothing Factor (0.1 = Slow/Smooth, 0.5 = Fast/Snappy)
-            lerpFactor: 0.5 // DIPERCEPAT AGAR TIDAK LAMBAT
+            lerpFactor: 0.5 
         };
 
         let gameState = { running: false, score: 0, wave: 1, zombies: [], hp: 100, ammo: CONFIG.startAmmo };
@@ -495,10 +495,11 @@
             zombie.appendChild(model);
 
             // 2. HITBOX (Expanded Size for Mobile)
-            const geometry = new THREE.BoxGeometry(20, 40, 20); // DIPERBESAR 2x
+            // Diperbesar sesuai modelScale yang baru (80)
+            const geometry = new THREE.BoxGeometry(30, 100, 30); 
             const material = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }); 
             const hitboxMesh = new THREE.Mesh(geometry, material);
-            hitboxMesh.position.set(0, 15, 0);
+            hitboxMesh.position.set(0, 50, 0); // Naikkan agar sesuai tinggi model baru
             
             // PENTING: Link Mesh ke DOM Element zombie parentnya
             hitboxMesh.userData = { parentEntity: zombie };
