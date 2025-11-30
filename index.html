@@ -283,8 +283,8 @@
             radarScale: 0.5,
             damageDistance: 8.0,
             startAmmo: 30,
-            // Smoothing Factor (Lower = Smoother but slower, Higher = Faster but jittery)
-            lerpFactor: 0.15 
+            // Smoothing Factor (0.1 = Slow/Smooth, 0.5 = Fast/Snappy)
+            lerpFactor: 0.5 // DIPERCEPAT AGAR TIDAK LAMBAT
         };
 
         let gameState = { running: false, score: 0, wave: 1, zombies: [], hp: 100, ammo: CONFIG.startAmmo };
@@ -363,18 +363,19 @@
             const gun = document.getElementById('player-gun');
             if (gun) {
                 // Konversi 2D Screen (0..1) ke 3D Local Position
-                // SENSITIVITAS DIKURANGI AGAR PISTOL TIDAK KELUAR LAYAR
-                const targetX = (handData.x - 0.5) * 1.5; // Reduced from 4.0
-                const targetY = -(handData.y - 0.5) * 1.2; // Reduced from 3.0
+                const targetX = (handData.x - 0.5) * 1.5; 
+                const targetY = -(handData.y - 0.5) * 1.2; 
                 
-                // Offset posisi agar pistol terlihat natural di tangan (bawah kanan kursor)
-                // Offset X diubah dari +0.15 menjadi -0.1 agar lebih ke kiri
+                // Offset posisi agar pistol terlihat natural di tangan
                 gun.object3D.position.x = lerp(gun.object3D.position.x, targetX - 0.1, 0.1);
                 gun.object3D.position.y = lerp(gun.object3D.position.y, targetY - 0.25, 0.1);
                 
-                // Rotasi pistol mengikuti kursor
-                gun.object3D.rotation.y = -targetX * 0.3;
-                gun.object3D.rotation.x = targetY * 0.3;
+                // Rotasi pistol mengikuti kursor DENGAN KEMIRINGAN (Tilt)
+                // Y: Yaw (Kiri/Kanan) + Bias ke kiri (+0.2)
+                // Z: Roll (Miring)
+                gun.object3D.rotation.y = (-targetX * 0.5) + 0.2; 
+                gun.object3D.rotation.x = targetY * 0.4;
+                gun.object3D.rotation.z = 0.15; // Miring ke kiri (Roll)
             }
 
             requestAnimationFrame(gameLoop);
