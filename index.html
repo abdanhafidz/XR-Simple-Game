@@ -10,7 +10,7 @@
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
     
-    <!-- MediaPipe -->
+    <!-- MediaPipe (Optional Load) -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
@@ -124,7 +124,8 @@
             left: 50%; top: 50%;
         }
         .crosshair.active { border-color: #0f0; }
-        .crosshair.lost { border-color: #ffaa00; opacity: 0.5; width: 40px; height: 40px; }
+        .crosshair.lost { border-color: #ffaa00; opacity: 0.6; width: 40px; height: 40px; } /* Mode Head Aim */
+        .crosshair.locked { border-color: #ff0000; background: rgba(255, 0, 0, 0.2); transform: translate(-50%, -50%) scale(1.2); } /* Target Locked */
 
         .crosshair::after { content: ''; width: 4px; height: 4px; background: #fff; border-radius: 50%; }
 
@@ -184,7 +185,7 @@
     <div id="damage-flash"></div>
 
     <div id="ui-layer">
-        <div id="status-log">Ready. Tap to Start.</div>
+        <div id="status-log">System Ready.</div>
 
         <div class="hud-top">
             <div class="hud-panel panel-kills">
@@ -223,7 +224,7 @@
     <div id="start-screen" class="fullscreen-overlay">
         <h1 style="font-family:'Orbitron'; color:red; font-size: 40px; text-shadow: 0 0 20px red;">ZOMBIE PROTOCOL</h1>
         <p style="color:#aaa; font-family:'Share Tech Mono'; margin-bottom: 10px;">
-            [ WEBXR AR MODE ]
+            [ WEBXR 6DoF ENABLED ]
         </p>
         <p style="color:#0ff; font-family:'Share Tech Mono'; font-size: 14px; max-width: 300px; line-height: 1.5;">
             1. <strong>Mundur Fisik</strong> untuk menghindar.<br>
@@ -240,7 +241,6 @@
     </div>
 
     <!-- WEBXR SCENE -->
-    <!-- vr-mode-ui="enabled: false" -> Menyembunyikan tombol default A-Frame agar user pake tombol kita -->
     <a-scene 
         vr-mode-ui="enabled: false"
         game-manager 
@@ -255,10 +255,12 @@
         <a-light type="ambient" color="#fff" intensity="0.8"></a-light>
         <a-light type="directional" color="#0ff" intensity="1.2" position="-1 2 0"></a-light>
 
+        <!-- Start Point Marker -->
         <a-cylinder color="#0f0" radius="0.05" height="100" position="0 0 0" opacity="0.3"></a-cylinder>
 
         <a-entity id="rig" position="0 0 0">
             <a-camera id="player-camera" position="0 1.6 0" look-controls="enabled: true">
+                <!-- Pistol Position Optimized -->
                 <a-entity id="player-gun" position="0.15 -0.3 -0.5" rotation="0 0 0" scale="1.5 1.5 1.5" visible="true">
                     <a-box color="#111" width="0.08" height="0.12" depth="0.3" position="0 0 0"></a-box>
                     <a-cylinder color="#333" radius="0.03" height="0.4" rotation="90 0 0" position="0 0.05 -0.2"></a-cylinder>
@@ -278,10 +280,11 @@
         const CONFIG = {
             spawnDistMin: 15, spawnDistMax: 30, 
             modelScale: 40,  
-            yOffset: 0,      
-            damageDistance: 6.0, 
+            yOffset: -25,    // FIX: Turun ke -25 (Sangat rendah agar menapak)
+            damageDistance: 10.0, // FIX: Range serangan diperbesar
             startAmmo: 50,
-            lerpFactor: 0.3 
+            lerpFactor: 0.3,
+            aimTolerance: 0.35 // FIX: Bidikan lebih mudah (0.35 layar)
         };
 
         let gameState = { running: false, score: 0, wave: 1, zombies: [], hp: 100, ammo: CONFIG.startAmmo };
@@ -294,13 +297,14 @@
             
             const video = document.getElementById('input-video');
             try {
+                // Timeout agresif: jika AR sibuk > 1 detik, langsung skip ke Head Aim
                 const streamPromise = navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
                 });
 
                 const stream = await Promise.race([
                     streamPromise,
-                    new Promise((_, reject) => setTimeout(() => reject("AR Busy"), 1500))
+                    new Promise((_, reject) => setTimeout(() => reject("AR Busy"), 1000))
                 ]);
 
                 video.srcObject = stream;
@@ -333,8 +337,12 @@
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 handData.detected = true;
                 status.style.display = 'none'; 
-                cursor.classList.add('active');
-                cursor.classList.remove('lost');
+                
+                // Jika tangan ada, hapus status lost/locked dulu
+                if(!cursor.classList.contains('locked')) {
+                    cursor.classList.add('active');
+                    cursor.classList.remove('lost');
+                }
 
                 const landmarks = results.multiHandLandmarks[0];
                 const indexTip = landmarks[8]; 
@@ -342,18 +350,20 @@
                 handData.rawY = indexTip.y;
             } else {
                 handData.detected = false;
-                cursor.classList.remove('active');
-                cursor.classList.add('lost'); 
+                // Jangan hapus class locked jika sedang membidik target
+                if(!cursor.classList.contains('locked')) {
+                    cursor.classList.remove('active');
+                    cursor.classList.add('lost'); 
+                }
             }
         }
 
-        // --- NEW: A-FRAME COMPONENT UNTUK GAME LOOP ---
-        // Ini menjamin loop jalan terus meskipun window.RAF di-pause browser saat AR
+        // --- GAME LOOP UPDATE ---
         AFRAME.registerComponent('game-manager', {
             tick: function (time, timeDelta) {
                 if (!gameState.running) return;
 
-                // 1. UPDATE LOGIKA TANGAN / BIDIK
+                // 1. UPDATE POSISI KURSOR
                 if (handData.detected) {
                     handData.x = lerp(handData.x, handData.rawX, CONFIG.lerpFactor);
                     handData.y = lerp(handData.y, handData.rawY, CONFIG.lerpFactor);
@@ -361,6 +371,9 @@
                     handData.x = lerp(handData.x, 0.5, 0.1); 
                     handData.y = lerp(handData.y, 0.5, 0.1);
                 }
+
+                // 2. CEK BIDIKAN (VISUAL FEEDBACK)
+                checkAimOverlap();
 
                 const cursor = document.getElementById('finger-cursor');
                 if(cursor) {
@@ -381,6 +394,35 @@
                 }
             }
         });
+
+        // Helper untuk mengubah warna crosshair jika mengenai target
+        function checkAimOverlap() {
+            const cursor = document.getElementById('finger-cursor');
+            const camEl = document.getElementById('player-camera');
+            if(!camEl) return;
+            const threeCamera = camEl.getObject3D('camera');
+            
+            // Konversi 0..1 ke -1..1
+            const x = (handData.x * 2) - 1;
+            const y = -(handData.y * 2) + 1;
+
+            let isLocked = false;
+            gameState.zombies.forEach(zombie => {
+                if(isLocked || zombie.dataset.dead === "true") return;
+                const pos = new THREE.Vector3();
+                zombie.object3D.getWorldPosition(pos);
+                pos.project(threeCamera);
+                
+                // Screen distance
+                const dist = Math.sqrt((pos.x - x)**2 + (pos.y - y)**2);
+                if (dist < CONFIG.aimTolerance && pos.z < 1) {
+                    isLocked = true;
+                }
+            });
+
+            if(isLocked) cursor.classList.add('locked');
+            else cursor.classList.remove('locked');
+        }
 
         AFRAME.registerComponent('titan-ai', {
             init: function() { this.el.object3D.position.y = CONFIG.yOffset; },
@@ -417,14 +459,12 @@
             document.getElementById('start-screen').style.display = 'none';
             gameState.running = true;
             
-            // Masuk mode AR secara programatikal
             const scene = document.querySelector('a-scene');
-            scene.enterVR(); // Ini mentrigger AR/VR mode
+            scene.enterVR(); 
 
             spawnWave();
             setInterval(updateRadar, 150);
 
-            // Listeners
             scene.addEventListener('select', () => shoot());
             window.addEventListener('click', (e) => {
                 if(e.target.classList.contains('btn-start')) return;
@@ -472,7 +512,8 @@
             model.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1.5');
             zombie.appendChild(model);
 
-            const geometry = new THREE.BoxGeometry(0.8 * CONFIG.modelScale, 2 * CONFIG.modelScale, 0.8 * CONFIG.modelScale);
+            // FIX: Hitbox Diperbesar 3x agar gampang kena
+            const geometry = new THREE.BoxGeometry(3 * CONFIG.modelScale, 4 * CONFIG.modelScale, 3 * CONFIG.modelScale);
             const material = new THREE.MeshBasicMaterial({ visible: false }); 
             const hitboxMesh = new THREE.Mesh(geometry, material);
             hitboxMesh.position.set(0, 1 * CONFIG.modelScale, 0);
@@ -509,6 +550,7 @@
             const y = -(handData.y * 2) + 1;
 
             raycaster.setFromCamera(new THREE.Vector2(x, y), threeCamera);
+            // Hitbox sudah diperbesar, raycast harusnya lebih akurat
             const intersects = raycaster.intersectObjects(shootableObjects);
 
             if (intersects.length > 0) {
@@ -519,6 +561,7 @@
                 }
             }
 
+            // Fallback: Aim Assist (Screen Space) diperbesar toleransinya
             if (!hitFound) {
                 gameState.zombies.forEach(zombie => {
                     if (hitFound || zombie.dataset.dead === "true") return;
@@ -527,7 +570,8 @@
                     pos.project(threeCamera);
                     const dist = Math.sqrt((pos.x - x)**2 + (pos.y - y)**2);
                     
-                    if (dist < 0.2 && pos.z < 1) {
+                    // Toleransi 0.35 (sangat mudah)
+                    if (dist < CONFIG.aimTolerance && pos.z < 1) {
                         killZombie(zombie, null);
                         hitFound = true;
                     }
