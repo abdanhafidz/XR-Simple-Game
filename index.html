@@ -10,7 +10,7 @@
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
     
-    <!-- MediaPipe (Optional Load) -->
+    <!-- MediaPipe -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
@@ -240,7 +240,10 @@
     </div>
 
     <!-- WEBXR SCENE -->
+    <!-- vr-mode-ui="enabled: false" -> Menyembunyikan tombol default A-Frame agar user pake tombol kita -->
     <a-scene 
+        vr-mode-ui="enabled: false"
+        game-manager 
         webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #ui-layer; referenceSpaceType: local-floor;"
         renderer="antialias: true; colorManagement: true; logarithmicDepthBuffer: true;"
         loading-screen="enabled: false">
@@ -252,12 +255,10 @@
         <a-light type="ambient" color="#fff" intensity="0.8"></a-light>
         <a-light type="directional" color="#0ff" intensity="1.2" position="-1 2 0"></a-light>
 
-        <!-- BEACON HIJAU (Titik Start) -->
         <a-cylinder color="#0f0" radius="0.05" height="100" position="0 0 0" opacity="0.3"></a-cylinder>
 
         <a-entity id="rig" position="0 0 0">
             <a-camera id="player-camera" position="0 1.6 0" look-controls="enabled: true">
-                <!-- Pistol Position Optimized for Portrait: 0.15, -0.3, -0.5 -->
                 <a-entity id="player-gun" position="0.15 -0.3 -0.5" rotation="0 0 0" scale="1.5 1.5 1.5" visible="true">
                     <a-box color="#111" width="0.08" height="0.12" depth="0.3" position="0 0 0"></a-box>
                     <a-cylinder color="#333" radius="0.03" height="0.4" rotation="90 0 0" position="0 0.05 -0.2"></a-cylinder>
@@ -269,7 +270,6 @@
             </a-camera>
         </a-entity>
         
-        <!-- Floor Invisible -->
         <a-plane rotation="-90 0 0" width="200" height="200" color="#000" opacity="0"></a-plane>
 
     </a-scene>
@@ -277,8 +277,8 @@
     <script>
         const CONFIG = {
             spawnDistMin: 15, spawnDistMax: 30, 
-            modelScale: 40,  // Scale Titan
-            yOffset: -15,    // FIX: Turun ke -15 (Lebih rendah dari lantai)
+            modelScale: 40,  
+            yOffset: 0,      
             damageDistance: 6.0, 
             startAmmo: 50,
             lerpFactor: 0.3 
@@ -288,14 +288,12 @@
         let handData = { rawX: 0.5, rawY: 0.5, x: 0.5, y: 0.5, detected: false };
         let shootableObjects = []; 
 
-        // CAMERA - Fallback Oriented
         async function initCamera() {
             const status = document.getElementById('status-log');
+            status.innerText = "Init Camera...";
             
             const video = document.getElementById('input-video');
             try {
-                // Mencoba akses kamera dengan timeout sangat singkat
-                // Jika browser AR memblokir, kita langsung skip ke Head Aim
                 const streamPromise = navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
                 });
@@ -349,36 +347,40 @@
             }
         }
 
-        function gameLoop() {
-            if (!gameState.running) return;
+        // --- NEW: A-FRAME COMPONENT UNTUK GAME LOOP ---
+        // Ini menjamin loop jalan terus meskipun window.RAF di-pause browser saat AR
+        AFRAME.registerComponent('game-manager', {
+            tick: function (time, timeDelta) {
+                if (!gameState.running) return;
 
-            if (handData.detected) {
-                handData.x = lerp(handData.x, handData.rawX, CONFIG.lerpFactor);
-                handData.y = lerp(handData.y, handData.rawY, CONFIG.lerpFactor);
-            } else {
-                // Head Aim Mode: Selalu di tengah
-                handData.x = lerp(handData.x, 0.5, 0.1); 
-                handData.y = lerp(handData.y, 0.5, 0.1);
+                // 1. UPDATE LOGIKA TANGAN / BIDIK
+                if (handData.detected) {
+                    handData.x = lerp(handData.x, handData.rawX, CONFIG.lerpFactor);
+                    handData.y = lerp(handData.y, handData.rawY, CONFIG.lerpFactor);
+                } else {
+                    handData.x = lerp(handData.x, 0.5, 0.1); 
+                    handData.y = lerp(handData.y, 0.5, 0.1);
+                }
+
+                const cursor = document.getElementById('finger-cursor');
+                if(cursor) {
+                    cursor.style.left = `${handData.x * 100}%`;
+                    cursor.style.top = `${handData.y * 100}%`;
+                }
+
+                const gun = document.getElementById('player-gun');
+                if (gun) {
+                    const targetX = (handData.x - 0.5) * 1.5; 
+                    const targetY = -(handData.y - 0.5) * 1.2; 
+                    
+                    gun.object3D.position.x = lerp(gun.object3D.position.x, targetX + 0.15, 0.2);
+                    gun.object3D.position.y = lerp(gun.object3D.position.y, targetY - 0.3, 0.2);
+                    gun.object3D.rotation.y = (-targetX * 0.8) + 0.1; 
+                    gun.object3D.rotation.x = targetY * 0.6;
+                    gun.object3D.rotation.z = 0.1; 
+                }
             }
-
-            const cursor = document.getElementById('finger-cursor');
-            cursor.style.left = `${handData.x * 100}%`;
-            cursor.style.top = `${handData.y * 100}%`;
-
-            const gun = document.getElementById('player-gun');
-            if (gun) {
-                const targetX = (handData.x - 0.5) * 1.5; 
-                const targetY = -(handData.y - 0.5) * 1.2; 
-                
-                gun.object3D.position.x = lerp(gun.object3D.position.x, targetX + 0.15, 0.2);
-                gun.object3D.position.y = lerp(gun.object3D.position.y, targetY - 0.3, 0.2);
-                
-                gun.object3D.rotation.y = (-targetX * 0.8) + 0.1; 
-                gun.object3D.rotation.x = targetY * 0.6;
-                gun.object3D.rotation.z = 0.1; 
-            }
-            requestAnimationFrame(gameLoop);
-        }
+        });
 
         AFRAME.registerComponent('titan-ai', {
             init: function() { this.el.object3D.position.y = CONFIG.yOffset; },
@@ -399,7 +401,7 @@
                 if (dist > 3.0) { 
                     this.el.object3D.lookAt(camPos.x, CONFIG.yOffset, camPos.z);
                     const dir = new THREE.Vector3(dx, 0, dz).normalize().negate(); 
-                    this.el.object3D.position.addScaledVector(dir, 0.03); 
+                    this.el.object3D.position.addScaledVector(dir, 0.02); 
                 }
 
                 if (dist <= CONFIG.damageDistance) {
@@ -411,16 +413,18 @@
             }
         });
 
-        // SAFETY START: Zombie & Logic jalan duluan
         function startGame() {
             document.getElementById('start-screen').style.display = 'none';
             gameState.running = true;
             
+            // Masuk mode AR secara programatikal
+            const scene = document.querySelector('a-scene');
+            scene.enterVR(); // Ini mentrigger AR/VR mode
+
             spawnWave();
             setInterval(updateRadar, 150);
-            gameLoop();
 
-            const scene = document.querySelector('a-scene');
+            // Listeners
             scene.addEventListener('select', () => shoot());
             window.addEventListener('click', (e) => {
                 if(e.target.classList.contains('btn-start')) return;
@@ -429,7 +433,6 @@
             const fireBtn = document.getElementById('fire-btn');
             fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); shoot(); }, {passive:false});
 
-            // Init AI belakangan, kalau gagal biarkan (Head Aim Only)
             initAndSetupAI();
         }
 
