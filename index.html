@@ -276,11 +276,11 @@
     <script>
         // CONFIG
         const CONFIG = {
-            // FIX: Jarak spawn dijauhkan DUA KALI LIPAT (100-200)
             spawnDistMin: 100, spawnDistMax: 200, 
             modelScale: 80, 
-            yOffset: -120, // Tetap di -120 (Height Fixed)
-            radarScale: 0.5,
+            yOffset: -120,
+            // FIX: Radar scale dikecilkan (0.2) agar cover area 200m
+            radarScale: 0.2, 
             damageDistance: 15.0,
             startAmmo: 30,
             lerpFactor: 0.5 
@@ -616,21 +616,32 @@
                 const dx = zPos.x - cam.position.x;
                 const dz = zPos.z - cam.position.z;
                 
-                const rx = dx * Math.cos(angle) - dz * Math.sin(angle);
-                const rz = dx * Math.sin(angle) + dz * Math.cos(angle);
+                // Kalkulasi offset
+                let rx = dx * Math.cos(angle) - dz * Math.sin(angle);
+                let rz = dx * Math.sin(angle) + dz * Math.cos(angle);
                 
-                const px = 50 + (rx * CONFIG.radarScale);
-                const py = 50 - (rz * CONFIG.radarScale);
-                
-                const distFromCenter = Math.sqrt((px-50)**2 + (py-50)**2);
+                // Skala posisi
+                let scaledRx = rx * CONFIG.radarScale;
+                let scaledRz = rz * CONFIG.radarScale;
 
-                if (distFromCenter < 45) { 
-                    const blip = document.createElement('div');
-                    blip.className = 'radar-blip';
-                    blip.style.left = px + 'px'; 
-                    blip.style.top = py + 'px';
-                    radar.appendChild(blip);
+                // FIX: CLAMPING LOGIC
+                // Jika zombie terlalu jauh, "tempel" titik di pinggir radar
+                const distFromCenter = Math.sqrt(scaledRx**2 + scaledRz**2);
+                if (distFromCenter > 42) {
+                    const factor = 42 / distFromCenter;
+                    scaledRx *= factor;
+                    scaledRz *= factor;
                 }
+                
+                // Konversi ke koordinat layar radar (50,50 adalah tengah)
+                const px = 50 + scaledRx;
+                const py = 50 - scaledRz;
+
+                const blip = document.createElement('div');
+                blip.className = 'radar-blip';
+                blip.style.left = px + 'px'; 
+                blip.style.top = py + 'px';
+                radar.appendChild(blip);
             });
         }
     </script>
