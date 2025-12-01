@@ -279,11 +279,11 @@
             spawnDistMin: 100, spawnDistMax: 200, 
             modelScale: 80, 
             yOffset: -120,
-            // FIX: Radar scale dikecilkan (0.2) agar cover area 200m
             radarScale: 0.2, 
             damageDistance: 15.0,
             startAmmo: 30,
-            lerpFactor: 0.5 
+            // FIX: Tingkatkan responsiveness agar menempel jari (0.5 -> 0.8)
+            lerpFactor: 0.8 
         };
 
         let gameState = { running: false, score: 0, wave: 1, zombies: [], hp: 100, ammo: CONFIG.startAmmo };
@@ -329,7 +329,9 @@
                 const landmarks = results.multiHandLandmarks[0];
                 const indexTip = landmarks[8]; 
                 
-                handData.rawX = 1.0 - indexTip.x; 
+                // FIX: Gunakan Direct Mapping untuk kamera belakang (non-mirror)
+                // Hapus "1.0 - indexTip.x" menjadi "indexTip.x"
+                handData.rawX = indexTip.x; 
                 handData.rawY = indexTip.y;
 
             } else {
