@@ -4,7 +4,7 @@
     <meta charset='utf-8'>
     <meta http-equiv='X-UA-Compatible' content='IE=edge'>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>AR Zombie Shooter: Cyberpunk Edition (Fixed Aim)</title>
+    <title>AR Zombie Shooter: Cyberpunk Edition (Height Fixed)</title>
     
     <!-- Libraries -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
@@ -260,8 +260,6 @@
 
         <a-camera gps-camera rotation-reader far="5000">
             <!-- PISTOL 3D PROCEDURAL (Neon Style) -->
-            <!-- Adjusted Position and Scale for Mobile Visibility -->
-            <!-- Position: Lebih kiri (-0.2), Lebih depan/jauh (-1.5) -->
             <a-entity id="player-gun" position="-0.2 -0.4 -1.5" rotation="0 0 0" scale="1.5 1.5 1.5" visible="false">
                 <a-box color="#111" width="0.08" height="0.12" depth="0.3" position="0 0 0"></a-box>
                 <a-cylinder color="#333" radius="0.03" height="0.4" rotation="90 0 0" position="0 0.05 -0.2"></a-cylinder>
@@ -278,23 +276,23 @@
     <script>
         // CONFIG
         const CONFIG = {
-            spawnDistMin: 40, spawnDistMax: 80,
-            modelScale: 80, yOffset: -60, // DIPERBESAR & DITURUNKAN POSISINYA
+            // FIX: Jarak spawn dijauhkan sedikit & yOffset diturunkan DRASTIS
+            spawnDistMin: 50, spawnDistMax: 100,
+            modelScale: 80, 
+            yOffset: -120, // FIX: Diturunkan dari -60 ke -120 agar zombie terlihat "membumi"
             radarScale: 0.5,
-            damageDistance: 15.0, // Jarak damage diperbesar karena zombie lebih besar
+            damageDistance: 15.0,
             startAmmo: 30,
-            // Smoothing Factor (0.1 = Slow/Smooth, 0.5 = Fast/Snappy)
             lerpFactor: 0.5 
         };
 
         let gameState = { running: false, score: 0, wave: 1, zombies: [], hp: 100, ammo: CONFIG.startAmmo };
         let handData = { 
-            rawX: 0.5, rawY: 0.5, // Data mentah dari MediaPipe
-            x: 0.5, y: 0.5,       // Data setelah di-smooth (Lerp)
+            rawX: 0.5, rawY: 0.5,
+            x: 0.5, y: 0.5,
             detected: false 
         };
         
-        // Array khusus untuk menyimpan Hitbox Mesh agar Raycaster efisien
         let shootableObjects = []; 
 
         // --- UTILS: LERP ---
@@ -310,7 +308,7 @@
             hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
             hands.setOptions({
                 maxNumHands: 1,
-                modelComplexity: 0, // 0 = Lite (Cepat), 1 = Full
+                modelComplexity: 0,
                 minDetectionConfidence: 0.5,
                 minTrackingConfidence: 0.5
             });
@@ -331,7 +329,6 @@
                 const landmarks = results.multiHandLandmarks[0];
                 const indexTip = landmarks[8]; 
                 
-                // Simpan target raw (dibalik horizontal karena kamera selfie mirror)
                 handData.rawX = 1.0 - indexTip.x; 
                 handData.rawY = indexTip.y;
 
@@ -344,7 +341,6 @@
         }
 
         // --- GAME LOOP & SMOOTHING ---
-        // Kita gunakan requestAnimationFrame terpisah untuk update visual agar smooth
         function gameLoop() {
             if (!gameState.running) return;
 
@@ -362,20 +358,15 @@
             // 3. Update 3D Gun Position
             const gun = document.getElementById('player-gun');
             if (gun) {
-                // Konversi 2D Screen (0..1) ke 3D Local Position
                 const targetX = (handData.x - 0.5) * 1.5; 
                 const targetY = -(handData.y - 0.5) * 1.2; 
                 
-                // Offset posisi agar pistol terlihat natural di tangan
                 gun.object3D.position.x = lerp(gun.object3D.position.x, targetX - 0.1, 0.1);
                 gun.object3D.position.y = lerp(gun.object3D.position.y, targetY - 0.25, 0.1);
                 
-                // Rotasi pistol mengikuti kursor DENGAN KEMIRINGAN (Tilt)
-                // Y: Yaw (Kiri/Kanan) + Bias ke kiri (+0.2)
-                // Z: Roll (Miring)
                 gun.object3D.rotation.y = (-targetX * 0.5) + 0.2; 
                 gun.object3D.rotation.x = targetY * 0.4;
-                gun.object3D.rotation.z = 0.15; // Miring ke kiri (Roll)
+                gun.object3D.rotation.z = 0.15;
             }
 
             requestAnimationFrame(gameLoop);
@@ -388,7 +379,6 @@
                 if (!gameState.running || this.el.dataset.dead === "true") return;
                 const zPos = this.el.object3D.position;
                 
-                // Safety check for camera
                 const camEl = document.querySelector('[gps-camera]');
                 if (!camEl || !camEl.object3D) return;
                 
@@ -402,7 +392,7 @@
                 if (dist > 2) {
                     this.el.object3D.lookAt(camPos.x, zPos.y, camPos.z);
                     const dir = new THREE.Vector3(dx, 0, dz).normalize().negate(); 
-                    this.el.object3D.position.addScaledVector(dir, 0.25); // Speed
+                    this.el.object3D.position.addScaledVector(dir, 0.25);
                 }
 
                 // Damage logic
@@ -410,7 +400,6 @@
                     if (!this.lastHit || Date.now() - this.lastHit > 1000) {
                         takeDamage(10);
                         this.lastHit = Date.now();
-                        // Shake camera effect (simple)
                         document.body.style.transform = "translate(5px, 5px)";
                         setTimeout(() => document.body.style.transform = "none", 50);
                     }
@@ -424,10 +413,8 @@
             gameState.running = true;
             setupMediaPipe();
             
-            // FIX: Wait for AR.js to inject the video element
             const checkVideoInterval = setInterval(() => {
                 const videoElement = document.querySelector('video');
-                // Ensure video is ready
                 if (videoElement && videoElement.readyState >= 2) {
                     clearInterval(checkVideoInterval);
                     processVideo(videoElement);
@@ -435,11 +422,10 @@
                 }
             }, 500);
 
-            gameLoop(); // Start smoothing loop
+            gameLoop();
             spawnWave();
             setInterval(updateRadar, 150);
 
-            // Inputs - Mencegah delay di mobile
             const fireBtn = document.getElementById('fire-btn');
             fireBtn.addEventListener('touchstart', (e) => { 
                 e.preventDefault(); 
@@ -453,21 +439,17 @@
 
         async function processVideo(videoElement) {
             if (!gameState.running) return;
-            
             try {
                 if (videoElement && videoElement.readyState >= 2) {
                     await hands.send({image: videoElement});
                 }
             } catch (error) {
-                // Ignore transient errors to prevent stopping the loop
                 console.warn("Hand tracking frame skipped:", error);
             }
-            
             requestAnimationFrame(() => processVideo(videoElement));
         }
 
         function spawnWave() { 
-            // Spawn 3 zombies
             for(let i=0; i<3; i++) setTimeout(spawnTitan, i * 1000); 
         }
 
@@ -494,20 +476,14 @@
             model.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1.5');
             zombie.appendChild(model);
 
-            // 2. HITBOX (Expanded Size for Mobile)
-            // Diperbesar sesuai modelScale yang baru (80)
+            // 2. HITBOX
             const geometry = new THREE.BoxGeometry(30, 100, 30); 
             const material = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }); 
             const hitboxMesh = new THREE.Mesh(geometry, material);
-            hitboxMesh.position.set(0, 50, 0); // Naikkan agar sesuai tinggi model baru
+            hitboxMesh.position.set(0, 50, 0); 
             
-            // PENTING: Link Mesh ke DOM Element zombie parentnya
             hitboxMesh.userData = { parentEntity: zombie };
-            
-            // Tambahkan ke zombie entity (via object3D)
             zombie.object3D.add(hitboxMesh);
-            
-            // Tambahkan ke array global untuk target raycaster
             shootableObjects.push(hitboxMesh);
 
             scene.appendChild(zombie);
@@ -518,7 +494,6 @@
             if (!gameState.running || gameState.ammo <= 0) return;
             gameState.ammo--; updateHUD();
 
-            // FX: Recoil & Flash
             const gun = document.getElementById('player-gun');
             const flash = document.getElementById('muzzle-flash');
             if(gun) {
@@ -536,7 +511,6 @@
             const cameraEl = document.querySelector('[gps-camera]');
             const threeCamera = cameraEl.object3D.children.find(c => c.isCamera) || cameraEl.object3D.children[0];
 
-            // Konversi posisi cursor hand (0..1) ke Coordinates (-1..1)
             const x = (handData.x * 2) - 1;
             const y = -(handData.y * 2) + 1;
 
@@ -554,27 +528,20 @@
                 }
             }
 
-            // 2. FALLBACK: AIM ASSIST (SCREEN SPACE HIT)
-            // Jika Raycast 3D gagal (sering terjadi di mobile karena misalignment AR),
-            // kita gunakan logika 2D: apakah jari kita "dekat" dengan zombie di layar?
+            // 2. FALLBACK: AIM ASSIST
             if (!hitFound) {
                 gameState.zombies.forEach(zombie => {
                     if (hitFound || zombie.dataset.dead === "true") return;
 
-                    // Proyeksikan posisi 3D zombie ke Layar 2D (-1 s/d 1)
                     const pos = new THREE.Vector3();
                     zombie.object3D.getWorldPosition(pos);
-                    pos.project(threeCamera); // Project vector to screen space
+                    pos.project(threeCamera);
 
-                    // Hitung jarak antara Kursor Jari dan Posisi Zombie di layar
-                    // Jarak dihitung dalam Normalized Device Coordinates (NDC)
                     const distX = pos.x - x;
                     const distY = pos.y - y;
                     const dist = Math.sqrt(distX*distX + distY*distY);
 
-                    // Threshold 0.25 (sekitar 12.5% lebar layar). Cukup toleran.
-                    // Jika jari berada dalam radius ini dari zombie, hitung sebagai HIT.
-                    if (dist < 0.25 && pos.z < 1) { // pos.z < 1 memastikan zombie ada di depan kamera
+                    if (dist < 0.25 && pos.z < 1) { 
                         killZombie(zombie, null);
                         hitFound = true;
                     }
@@ -585,33 +552,24 @@
         function killZombie(el, hitboxMesh) {
             el.dataset.dead = "true";
             
-            // Hapus dari shootable array
             if (hitboxMesh) {
                 const index = shootableObjects.indexOf(hitboxMesh);
                 if (index > -1) shootableObjects.splice(index, 1);
-            } else {
-                // Jika via Aim Assist, cari mesh manual (sedikit lambat tapi aman)
-                // Sebenarnya tidak perlu remove dari array jika sudah di flag dataset.dead
             }
 
-            // Animasi Mati
             el.setAttribute('animation', 'property: rotation; to: -90 0 0; dur: 1000; easing: easeOutQuad');
             
-            // UI Update
             gameState.score++;
             updateHUD();
 
-            // Remove logic
             setTimeout(() => {
                 if (el.parentNode) el.parentNode.removeChild(el);
                 gameState.zombies = gameState.zombies.filter(z => z !== el);
                 
-                // Respawn logic
                 if (gameState.zombies.length < 2) {
                     gameState.wave++;
                     document.getElementById('wave').innerText = gameState.wave;
                     spawnWave();
-                    // Bonus ammo tiap wave
                     gameState.ammo += 15;
                     updateHUD();
                 }
@@ -644,35 +602,29 @@
             radar.innerHTML = '<div class="radar-center"></div>';
             
             const camEl = document.querySelector('[gps-camera]');
-            // Check if camera is ready to avoid errors
             if (!camEl || !camEl.object3D) return;
 
             const cam = camEl.object3D;
             const vec = new THREE.Vector3();
             cam.getWorldDirection(vec);
-            const angle = Math.atan2(vec.x, vec.z); // Simple heading calculation
+            const angle = Math.atan2(vec.x, vec.z);
 
             gameState.zombies.forEach(z => {
                 if (z.dataset.dead === "true") return;
                 const zPos = z.object3D.position;
                 
-                // Relatif terhadap kamera
                 const dx = zPos.x - cam.position.x;
                 const dz = zPos.z - cam.position.z;
                 
-                // Rotasi koordinat berdasarkan arah hadap kamera (agar radar berputar sesuai pandangan)
-                // Rumus rotasi 2D matrix
                 const rx = dx * Math.cos(angle) - dz * Math.sin(angle);
                 const rz = dx * Math.sin(angle) + dz * Math.cos(angle);
                 
-                // Map ke ukuran radar (50px radius)
                 const px = 50 + (rx * CONFIG.radarScale);
-                const py = 50 - (rz * CONFIG.radarScale); // - karena Z screen kebalikan Y canvas
+                const py = 50 - (rz * CONFIG.radarScale);
                 
-                // Batasi agar tidak keluar lingkaran
                 const distFromCenter = Math.sqrt((px-50)**2 + (py-50)**2);
 
-                if (distFromCenter < 45) { // 45px radius aman
+                if (distFromCenter < 45) { 
                     const blip = document.createElement('div');
                     blip.className = 'radar-blip';
                     blip.style.left = px + 'px'; 
